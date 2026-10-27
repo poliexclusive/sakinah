@@ -35,9 +35,15 @@ async function kirimWA(r) {
   if (w) w.location = j.data.url; else location.href = j.data.url;
 }
 async function cetakBukti(r, btn) {
-  btnBusy(btn, true); const j = await tulis('bukti.buat', { id: r.id, base64: true }, { silent: true, timeout: 60000 }); btnBusy(btn, false);
-  if (!j) { const x = await api('bukti.ambil', { id: r.id }); if (!x.success) return toast('Bukti belum dapat dibuat. Periksa izin Google Docs/Drive pada backend.', 'err'); return unduh(x.data.nama, b64Blob(x.data.base64, 'application/pdf')); }
-  unduh(j.data.nama, b64Blob(j.data.base64, 'application/pdf')); toast('Bukti booking diunduh.', 'ok');
+  btnBusy(btn, true);
+  try {
+    const base = String((App.boot.config && App.boot.config.appUrl) || (location.origin + location.pathname)).replace(/\/+$/, '').replace(/\/index\.html$/, '');
+    const blob = await Tiket.pdf({ nama: r.nama, rm: r.rm, tgl: r.tgl, jam: r.jam || '', alamat: r.alamat, dokter: r.dokter, id: r.id, verifUrl: base + '/#/v/' + r.kode });
+    const t = String(r.tgl).split('-');
+    unduh('Booking_' + t[2] + '_' + t[1] + '_' + t[0] + '__' + String(r.nama).trim().replace(/[^A-Za-z0-9]+/g, '_').toUpperCase() + '.pdf', blob);
+    toast('Booking confirmation diunduh.', 'ok');
+  } catch (e) { toast('Bukti belum dapat dibuat: ' + (e && e.message || e), 'err'); }
+  btnBusy(btn, false);
 }
 function bukaDetail(r, rerender) {
   const nm = r.nama, st = TRANSISI_UI[r.status] || [];

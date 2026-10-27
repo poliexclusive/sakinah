@@ -80,6 +80,10 @@ Jika Anda sudah memasang versi sebelumnya:
 
 Catatan: pendaftaran lama tanpa jam tetap tampil (diurutkan sebagai Pagi 08:00 / Sore 16:00). Template pesan WhatsApp yang sudah Anda ubah sendiri tidak ditimpa; jika masih memuat `{sesi}`, ganti dengan `{jam}` di menu Notifikasi.
 
+## UPDATE — Booking Confirmation ala boarding pass
+
+Perubahan ini **hanya di frontend** (backend tidak perlu diubah). Salin isi ZIP ke folder repository (jangan timpa `js/config.js`), pastikan folder baru **`img/`** ikut tersalin (berisi `lobi.jpg` dan `logo-rs.png`), lalu `git add .`, `git commit -m "boarding pass"`, `git push`. PDF dibuat langsung di browser, jadi instan dan tidak lagi memakai Google Docs. Untuk mengganti logo atau foto, timpa file di folder `img/` dengan nama yang sama.
+
 ## Cara pakai singkat
 
 - **Pendaftaran Baru**: pilih Appointment/Onsite → tanggal → jam kunjungan (bebas, format 24 jam) & dokter → pasien terdaftar *atau* pasien baru (otomatis kartu **SASA**) → penjamin → **F4** simpan. Onsite langsung *Hadir* + nomor antrean.
