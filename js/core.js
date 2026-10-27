@@ -165,7 +165,7 @@ const NAV = [
     { p: '/', t: 'Beranda', i: 'home' }, { p: '/daftar', t: 'Pendaftaran Baru', i: 'plus' }, { p: '/konfirmasi', t: 'Konfirmasi Booking', i: 'checkc', cnt: 'menunggu' },
     { p: '/antrean', t: 'Check-in & Antrean', i: 'ticket' }] },
   { g: 'Data', items: [{ p: '/data', t: 'Data Pasien', i: 'users' }, { p: '/laporan', t: 'Laporan & Grafik', i: 'chart' }] },
-  { g: 'Administrasi', admin: true, items: [{ p: '/jadwal', t: 'Dokter & Kuota', i: 'stetho' }, { p: '/wa', t: 'Notifikasi WhatsApp', i: 'wa' }, { p: '/crm', t: 'CRM Kontak', i: 'user' }, { p: '/pengaturan', t: 'Pengaturan', i: 'sliders' }] }
+  { g: 'Administrasi', admin: true, items: [{ p: '/jadwal', t: 'Dokter', i: 'stetho' }, { p: '/wa', t: 'Notifikasi WhatsApp', i: 'wa' }, { p: '/crm', t: 'CRM Kontak', i: 'user' }, { p: '/pengaturan', t: 'Pengaturan', i: 'sliders' }] }
 ];
 const BNAV = [{ p: '/', t: 'Beranda', i: 'home' }, { p: '/daftar', t: 'Daftar', i: 'plus' }, { p: '/konfirmasi', t: 'Konfirmasi', i: 'checkc' }, { p: '/antrean', t: 'Antrean', i: 'ticket' }, { p: '/data', t: 'Data', i: 'users' }];
 function shell() {

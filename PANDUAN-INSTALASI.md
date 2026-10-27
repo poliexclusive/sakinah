@@ -62,15 +62,27 @@ Update di kemudian hari: `git add .` → `git commit -m "update"` → `git push`
 ## BAGIAN D — Pengaturan Awal (sekali saja)
 
 1. Buka alamat situs → login **admin** + sandi sementara → aplikasi meminta Anda **mengganti sandi**.
-2. **Pengaturan → Umum**: isi nama, alamat, telepon, jam sesi, dan **URL aplikasi** = alamat GitHub Pages Anda (dipakai pada QR di bukti booking & pesan WhatsApp). Simpan.
-3. **Dokter & Kuota**: tambahkan dokter, hari praktik, dan **kuota per sesi** (Pagi/Sore).
+2. **Pengaturan → Umum**: isi nama, alamat, telepon, dan **URL aplikasi** = alamat GitHub Pages Anda (dipakai pada QR di bukti booking & pesan WhatsApp). Simpan.
+3. **Dokter**: tambahkan dokter (nama, spesialis, ruang). Tidak ada jadwal atau kuota: jam kunjungan ditentukan bebas oleh pasien saat pendaftaran.
 4. **Pengaturan → Pengguna**: buat akun untuk petugas pendaftaran.
 5. **Pengaturan → Impor Data Lama**: bawa data spreadsheet bulanan lama (tempel tautan Google Sheets atau salin-tempel dari Excel). Gunakan **Lihat dulu** sebelum **Impor**; aman diulang.
 6. **Notifikasi WhatsApp & Email** (opsional): menu *Notifikasi WhatsApp* → isi token Fonnte → aktifkan → **Kirim tes**. Atur event mana yang mengirim di tab *Event & Pesan*.
 
+## UPDATE — Dari versi sesi/kuota ke versi Jam Bebas
+
+Jika Anda sudah memasang versi sebelumnya:
+
+1. **Backend**: buka Apps Script, ganti isi `Kode.gs`, `Pendaftaran.gs`, `Admin.gs`, `Notifikasi.gs`, dan `Dokumen.gs` dengan file terbaru (`QrLib.gs` dan `appsscript.json` tidak berubah). Simpan.
+2. Pilih fungsi **`migrasiSkema`** lalu **Run** satu kali. Ini menambahkan kolom **Jam** di akhir sheet Pendaftaran. Data lama aman dan tidak diubah.
+3. **Deploy → Manage deployments → ✏️ Edit → Version: New version → Deploy.** URL tidak berubah.
+4. **Frontend**: salin isi folder ZIP ke folder repository Anda, **kecuali `js/config.js`** (yang sudah berisi GAS_URL Anda). Lalu `git add .`, `git commit -m "jam bebas"`, `git push`.
+5. Tekan Ctrl+F5 di browser.
+
+Catatan: pendaftaran lama tanpa jam tetap tampil (diurutkan sebagai Pagi 08:00 / Sore 16:00). Template pesan WhatsApp yang sudah Anda ubah sendiri tidak ditimpa; jika masih memuat `{sesi}`, ganti dengan `{jam}` di menu Notifikasi.
+
 ## Cara pakai singkat
 
-- **Pendaftaran Baru**: pilih Appointment/Onsite → tanggal → dokter & sesi (kuota tampil) → pasien terdaftar *atau* pasien baru (otomatis kartu **SASA**) → penjamin → **F4** simpan. Onsite langsung *Hadir* + nomor antrean.
+- **Pendaftaran Baru**: pilih Appointment/Onsite → tanggal → jam kunjungan (bebas, format 24 jam) & dokter → pasien terdaftar *atau* pasien baru (otomatis kartu **SASA**) → penjamin → **F4** simpan. Onsite langsung *Hadir* + nomor antrean.
 - **Konfirmasi Booking**: konfirmasi satu per satu atau massal; pasien menerima pesan otomatis bila notifikasi aktif.
 - **Check-in & Antrean**: tombol *Check-in* memberi nomor antrean (A-001, B-001, … per dokter).
 - **Data Pasien**: filter per bulan/dokter/penjamin → **Excel** atau **PDF**.
