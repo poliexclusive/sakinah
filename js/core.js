@@ -121,7 +121,10 @@ function konfirmasi(judul, pesan, o) {
 const badge = s => '<span class="bd2 s-' + esc(s) + '">' + esc(s) + '</span>';
 const skel = (n, h) => Array.from({ length: n || 4 }, () => '<div class="sk" style="height:' + (h || 16) + 'px;margin:14px 0"></div>').join('');
 function btnBusy(b, on) { if (!b) return; if (on) { b._h = b.innerHTML; b.disabled = true; b.innerHTML = '<span class="spin"></span>'; } else { b.disabled = false; if (b._h) b.innerHTML = b._h; } }
-function copyText(t) { try { navigator.clipboard.writeText(t); toast('Disalin.', 'ok'); } catch (e) { const a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); toast('Disalin.', 'ok'); } catch (e2) {} a.remove(); } }
+function copyText(t) {
+  const lama = () => { const a = document.createElement('textarea'); a.value = t; a.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(a); a.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (e) {} a.remove(); if (ok) toast('Disalin.', 'ok'); else toast('Tidak dapat menyalin otomatis. Salin manual dari kolom pesan.', 'err'); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(() => toast('Disalin.', 'ok'), lama); else lama();
+}
 function unduh(nama, blob) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nama; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); }
 function b64Blob(b64, type) { const bin = atob(b64), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new Blob([u], { type }); }
 function pager(total, hal, per) { const maks = Math.max(1, Math.ceil(total / per)); return '<div class="pager"><span>' + (total ? ((hal - 1) * per + 1) + '–' + Math.min(total, hal * per) + ' dari ' + total : 'Tidak ada data') + '</span><span class="grow"></span><button class="btn sm ico" data-pg="' + (hal - 1) + '" ' + (hal <= 1 ? 'disabled' : '') + ' aria-label="Sebelumnya">' + ic('left', 16) + '</button><span>Hal ' + hal + '/' + maks + '</span><button class="btn sm ico" data-pg="' + (hal + 1) + '" ' + (hal >= maks ? 'disabled' : '') + ' aria-label="Berikutnya">' + ic('right', 16) + '</button></div>'; }
@@ -162,19 +165,19 @@ window.addEventListener('hashchange', route);
 // ---------- shell (sidebar + topbar) ----------
 const NAV = [
   { g: 'Operasional', items: [
-    { p: '/', t: 'Beranda', i: 'home' }, { p: '/daftar', t: 'Pendaftaran Baru', i: 'plus' }, { p: '/konfirmasi', t: 'Konfirmasi Booking', i: 'checkc', cnt: 'menunggu' },
-    { p: '/antrean', t: 'Check-in & Antrean', i: 'ticket' }] },
+    { p: '/', t: 'Beranda', i: 'home' }, { p: '/daftar', t: 'Pendaftaran Baru', i: 'plus' }, { p: '/rekap', t: 'Rekap Hari Ini', i: 'list' }, { p: '/konfirmasi', t: 'Konfirmasi Booking', i: 'checkc', cnt: 'menunggu', lama: 1 },
+    { p: '/antrean', t: 'Check-in & Antrean', i: 'ticket', lama: 1 }] },
   { g: 'Data', items: [{ p: '/data', t: 'Data Pasien', i: 'users' }, { p: '/laporan', t: 'Laporan & Grafik', i: 'chart' }] },
-  { g: 'Administrasi', admin: true, items: [{ p: '/jadwal', t: 'Dokter', i: 'stetho' }, { p: '/wa', t: 'Notifikasi WhatsApp', i: 'wa' }, { p: '/crm', t: 'CRM Kontak', i: 'user' }, { p: '/pengaturan', t: 'Pengaturan', i: 'sliders' }] }
+  { g: 'Administrasi', admin: true, items: [{ p: '/jadwal', t: 'Dokter', i: 'stetho' }, { p: '/wa', t: 'Notifikasi WhatsApp', i: 'wa', lama: 1 }, { p: '/crm', t: 'CRM Kontak', i: 'user', lama: 1 }, { p: '/pengaturan', t: 'Pengaturan', i: 'sliders' }] }
 ];
-const BNAV = [{ p: '/', t: 'Beranda', i: 'home' }, { p: '/daftar', t: 'Daftar', i: 'plus' }, { p: '/konfirmasi', t: 'Konfirmasi', i: 'checkc' }, { p: '/antrean', t: 'Antrean', i: 'ticket' }, { p: '/data', t: 'Data', i: 'users' }];
+const BNAV = [{ p: '/', t: 'Beranda', i: 'home' }, { p: '/daftar', t: 'Daftar', i: 'plus' }, { p: '/rekap', t: 'Rekap', i: 'list' }, { p: '/konfirmasi', t: 'Konfirmasi', i: 'checkc', lama: 1 }, { p: '/antrean', t: 'Antrean', i: 'ticket', lama: 1 }, { p: '/data', t: 'Data', i: 'users' }];
 function shell() {
   const nama = (App.boot && App.boot.config && App.boot.config.nama) || CFG.NAMA, parts = nama.split(' ');
   $('#app').innerHTML = '<aside class="side" id="side"><div class="brand"><div class="nm">' + esc(parts.slice(0, -1).join(' ')) + ' <b>' + esc(parts.slice(-1)) + '</b></div><div class="sub">Registration Suite</div></div><nav class="nav" id="nav">' +
-    NAV.filter(g => !g.admin || isAdmin()).map(g => '<div class="grp">' + g.g + '</div>' + g.items.map(n => '<a data-p="' + n.p + '" href="#' + n.p + '">' + ic(n.i, 19) + '<span>' + n.t + '</span>' + (n.cnt ? '<span class="cnt hide" data-cnt="' + n.cnt + '"></span>' : '') + '</a>').join('')).join('') +
+    NAV.filter(g => !g.admin || isAdmin()).map(g => '<div class="grp">' + g.g + '</div>' + g.items.filter(n => !n.lama || fiturLama()).map(n => '<a data-p="' + n.p + '" href="#' + n.p + '">' + ic(n.i, 19) + '<span>' + n.t + '</span>' + (n.cnt ? '<span class="cnt hide" data-cnt="' + n.cnt + '"></span>' : '') + '</a>').join('')).join('') +
     '</nav><div class="me"><div class="avatar">' + esc((App.user.nama || '?').charAt(0).toUpperCase()) + '</div><div class="grow"><div class="n">' + esc(App.user.nama) + '</div><div class="r">' + (isAdmin() ? 'Administrator' : 'Petugas Pendaftaran') + '</div></div><button id="btn-out" aria-label="Keluar" title="Keluar">' + ic('logout', 18) + '</button></div></aside><div class="scrim" id="scrim"></div>' +
     '<div class="main"><header class="top"><button class="burger" id="burger" aria-label="Menu">' + ic('menu', 24) + '</button><div class="ttl" id="ttl"></div><span class="grow"></span><span class="date">' + tglHari(todayStr()) + '</span><button class="btn sm ico ghost" id="btn-pw" title="Ganti kata sandi" aria-label="Ganti kata sandi">' + ic('lock', 17) + '</button></header><main id="view"></main></div>' +
-    '<nav class="bnav">' + BNAV.map(n => '<a data-p="' + n.p + '" href="#' + n.p + '">' + ic(n.i, 21) + n.t + '</a>').join('') + '</nav>';
+    '<nav class="bnav">' + BNAV.filter(n => !n.lama || fiturLama()).map(n => '<a data-p="' + n.p + '" href="#' + n.p + '">' + ic(n.i, 21) + n.t + '</a>').join('') + '</nav>';
   const side = $('#side'), scrim = $('#scrim'); const tog = o => { side.classList.toggle('open', o); scrim.classList.toggle('on', o); };
   $('#burger').onclick = () => tog(true); scrim.onclick = () => tog(false); $('#nav').onclick = e => { if (e.target.closest('a')) tog(false); };
   $('#btn-out').onclick = () => logout(); $('#btn-pw').onclick = ubahSandi;

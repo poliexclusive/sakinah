@@ -84,6 +84,19 @@ Catatan: pendaftaran lama tanpa jam tetap tampil (diurutkan sebagai Pagi 08:00 /
 
 Perubahan ini **hanya di frontend** (backend tidak perlu diubah). Salin isi ZIP ke folder repository (jangan timpa `js/config.js`), pastikan folder baru **`img/`** ikut tersalin (berisi `lobi.jpg` dan `logo-rs.png`), lalu `git add .`, `git commit -m "boarding pass"`, `git push`. PDF dibuat langsung di browser, jadi instan dan tidak lagi memakai Google Docs. Untuk mengganti logo atau foto, timpa file di folder `img/` dengan nama yang sama.
 
+## UPDATE — Alur ringkas (Terdaftar → Kirim bukti → Rekap)
+
+Alur baru: daftar pasien → **Kirim bukti ke WhatsApp** (PDF + pesan) → pagi hari buka **Rekap Hari Ini** dan bagikan ke grup. Konfirmasi, Check-in/Antrean, WA otomatis, dan CRM disembunyikan (bisa dimunculkan lagi di Pengaturan → Fitur lanjutan).
+
+1. **Backend**: ganti isi `Kode.gs`, `Pendaftaran.gs`, `Admin.gs`, dan `Notifikasi.gs` dengan file terbaru. Tidak perlu `migrasiSkema` kali ini.
+2. **Deploy → Manage deployments → ✏️ Edit → Version: New version → Deploy.**
+3. **Frontend**: salin isi ZIP ke folder repository (**jangan timpa `js/config.js`**), lalu `git add .`, `git commit -m "alur ringkas"`, `git push`. Tekan Ctrl+F5.
+4. **Pengaturan → Umum**: sesuaikan *Pesan bukti booking* dengan gaya bahasa Anda. Di **Rekap Hari Ini**, isi daftar asisten lalu klik *Simpan sebagai bawaan*.
+
+Cara kirim dari HP: buka aplikasi di HP Polex, simpan pendaftaran, ketuk **Kirim bukti ke WhatsApp**, pilih WhatsApp lalu kontak pasien. PDF dan pesan terlampir sekaligus. Di komputer, PDF terunduh dan pesan tersalin; lampirkan PDF di chat yang terbuka.
+
+Catatan: perubahan jadwal asisten per hari tersimpan di perangkat yang dipakai; hanya *bawaan* yang tersimpan di server.
+
 ## Cara pakai singkat
 
 - **Pendaftaran Baru**: pilih Appointment/Onsite → tanggal → jam kunjungan (bebas, format 24 jam) & dokter → pasien terdaftar *atau* pasien baru (otomatis kartu **SASA**) → penjamin → **F4** simpan. Onsite langsung *Hadir* + nomor antrean.

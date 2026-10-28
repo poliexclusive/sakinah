@@ -1,6 +1,7 @@
 // pages-a.js — komponen bersama booking, login, verifikasi publik, beranda, form pendaftaran
 'use strict';
-const TRANSISI_UI = { Menunggu: ['Terkonfirmasi', 'Hadir', 'Batal'], Terkonfirmasi: ['Hadir', 'Batal', 'Menunggu'], Hadir: ['Selesai', 'Batal'], Selesai: [], Batal: ['Menunggu'] };
+const TRANSISI_UI = { Terdaftar: ['Selesai', 'Batal'], Menunggu: ['Terdaftar', 'Terkonfirmasi', 'Batal'], Terkonfirmasi: ['Hadir', 'Batal'], Hadir: ['Selesai', 'Batal'], Selesai: [], Batal: ['Terdaftar'] };
+const fiturLama = () => !!(App.boot && App.boot.config && App.boot.config.fiturLama);
 const hpOk = s => /^(0|62)8\d{7,12}$/.test(hp(s));
 const emailOk = s => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s);
 const nikOk = s => /^\d{16}$/.test(String(s || '').trim());
@@ -16,6 +17,7 @@ async function ubahStatus(r, ke, rerender, alasan) {
 }
 function tombolAksi(r) {
   const a = [];
+  if (r.status === 'Terdaftar') return '<button class="btn sm pri" data-share="' + esc(r.id) + '">' + ic('wa', 14) + ' Kirim bukti</button>';
   if (r.status === 'Menunggu') a.push(['Terkonfirmasi', 'Konfirmasi', 'ok', 'check']);
   if (r.status === 'Terkonfirmasi') a.push(['Hadir', 'Check-in', 'pri', 'ticket']);
   if (r.status === 'Hadir') a.push(['Selesai', 'Selesai', 'pri', 'checkc']);
@@ -24,6 +26,8 @@ function tombolAksi(r) {
 /** Pasang pendengar klik untuk tombol [data-st] dan baris [data-open] dalam sebuah wadah. */
 function pasangAksiBaris(root, getRows, rerender) {
   root.addEventListener('click', async e => {
+    const sh = e.target.closest('[data-share]');
+    if (sh) { e.stopPropagation(); const r = getRows().find(x => x.id === sh.dataset.share); if (r) bagikanBukti(r, sh); return; }
     const b = e.target.closest('[data-st]');
     if (b) { e.stopPropagation(); const r = getRows().find(x => x.id === b.dataset.id); if (!r) return; btnBusy(b, true); await ubahStatus(r, b.dataset.st, rerender); return; }
     const o = e.target.closest('[data-open]'); if (o && !e.target.closest('button,a')) { const r = getRows().find(x => x.id === o.dataset.open); if (r) bukaDetail(r, rerender); }
@@ -34,15 +38,33 @@ async function kirimWA(r) {
   if (!j.success) { if (w) w.close(); return toast(j.message, 'err'); }
   if (w) w.location = j.data.url; else location.href = j.data.url;
 }
+function urlVerif(r) { const base = String((App.boot.config && App.boot.config.appUrl) || (location.origin + location.pathname)).replace(/\/+$/, '').replace(/\/index\.html$/, ''); return base + '/#/v/' + r.kode; }
+function namaBerkas(r) { const t = String(r.tgl).split('-'); return 'Booking_' + t[2] + '_' + t[1] + '_' + t[0] + '__' + String(r.nama).trim().replace(/[^A-Za-z0-9]+/g, '_').toUpperCase() + '.pdf'; }
+function buatBuktiBlob(r) { return Tiket.pdf({ nama: r.nama, rm: r.rm, tgl: r.tgl, jam: r.jam || '', alamat: r.alamat, dokter: r.dokter, id: r.id, verifUrl: urlVerif(r) }); }
+const PESAN_BAWAAN = "Assalamu'alaikum Bapak/Ibu {nama},\n\nBerikut bukti booking *Poli Exclusive RSI Sakinah Mojokerto*:\n\n📅 {hari}, {tanggal}\n🕐 Pukul {jam} WIB\n👨‍⚕️ {dokter}\n🔖 Kode booking: {id}\n\nMohon hadir 15 menit lebih awal dan membawa kartu identitas. Tunjukkan bukti booking ini kepada petugas pendaftaran.\n\nTerima kasih 🙏";
+function pesanBukti(r) {
+  const tpl = (App.boot.config && App.boot.config.pesanBukti) || PESAN_BAWAAN, v = { nama: r.nama, hari: r.hari || hariDari(r.tgl), tanggal: tglIndo(r.tgl), jam: r.jam || jamTxt(r), dokter: r.dokter, id: r.id, rm: r.rm || '' };
+  return tpl.replace(/\{(\w+)\}/g, (m, k) => (v[k] !== undefined ? v[k] : m));
+}
+function linkWA(r, teks) { let n = hp(r.hp); if (n.startsWith('0')) n = '62' + n.slice(1); else if (n.startsWith('8')) n = '62' + n; return 'https://wa.me/' + n + '?text=' + encodeURIComponent(teks); }
 async function cetakBukti(r, btn) {
   btnBusy(btn, true);
+  try { unduh(namaBerkas(r), await buatBuktiBlob(r)); toast('Booking confirmation diunduh.', 'ok'); }
+  catch (e) { toast('Bukti belum dapat dibuat: ' + (e && e.message || e), 'err'); }
+  btnBusy(btn, false);
+}
+/** Satu ketukan: PDF + pesan ke WhatsApp. HP memakai menu bagikan; komputer mengunduh PDF, menyalin pesan, dan membuka chat. */
+async function bagikanBukti(r, btn) {
+  btnBusy(btn, true);
   try {
-    const base = String((App.boot.config && App.boot.config.appUrl) || (location.origin + location.pathname)).replace(/\/+$/, '').replace(/\/index\.html$/, '');
-    const blob = await Tiket.pdf({ nama: r.nama, rm: r.rm, tgl: r.tgl, jam: r.jam || '', alamat: r.alamat, dokter: r.dokter, id: r.id, verifUrl: base + '/#/v/' + r.kode });
-    const t = String(r.tgl).split('-');
-    unduh('Booking_' + t[2] + '_' + t[1] + '_' + t[0] + '__' + String(r.nama).trim().replace(/[^A-Za-z0-9]+/g, '_').toUpperCase() + '.pdf', blob);
-    toast('Booking confirmation diunduh.', 'ok');
-  } catch (e) { toast('Bukti belum dapat dibuat: ' + (e && e.message || e), 'err'); }
+    const blob = await buatBuktiBlob(r), teks = pesanBukti(r), file = new File([blob], namaBerkas(r), { type: 'application/pdf' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], text: teks }); btnBusy(btn, false); return; } catch (e) { if (e && e.name === 'AbortError') { btnBusy(btn, false); return; } }
+    }
+    unduh(file.name, blob); copyText(teks);
+    toast('PDF diunduh dan pesan disalin. Lampirkan PDF di chat WhatsApp.', 'ok');
+    window.open(linkWA(r, teks), '_blank');
+  } catch (e) { toast('Gagal menyiapkan bukti: ' + (e && e.message || e), 'err'); }
   btnBusy(btn, false);
 }
 function bukaDetail(r, rerender) {
@@ -53,15 +75,15 @@ function bukaDetail(r, rerender) {
   const m = modal({ title: nm, size: 'lg', body: '<div class="fg">' + dl.map(x => '<div><div class="lbl">' + x[0] + '</div><div>' + x[1] + '</div></div>').join('') + '</div>', foot: false });
   const bar = document.createElement('div'); bar.className = 'mf';
   const add = (id, label, ico, cls) => { const b = document.createElement('button'); b.className = 'btn ' + (cls || ''); b.dataset.a = id; b.innerHTML = ic(ico, 16) + ' ' + label; bar.appendChild(b); };
-  if (r.status !== 'Batal') { add('bukti', 'Bukti PDF', 'file'); add('wa', 'WhatsApp', 'wa'); }
+  if (r.status !== 'Batal') { add('share', 'Kirim bukti', 'wa', 'pri'); add('bukti', 'Unduh PDF', 'file'); }
   add('edit', 'Ubah catatan', 'edit');
-  if (['Menunggu', 'Terkonfirmasi'].includes(r.status)) add('jadwal', 'Jadwal ulang', 'calendar');
+  if (['Terdaftar', 'Menunggu', 'Terkonfirmasi'].includes(r.status)) add('jadwal', 'Jadwal ulang', 'calendar');
   st.forEach(s => add('st:' + s, s === 'Batal' ? 'Batalkan' : s === 'Menunggu' && r.status === 'Batal' ? 'Aktifkan kembali' : s === 'Menunggu' ? 'Kembali ke menunggu' : s === 'Hadir' ? 'Check-in' : s === 'Terkonfirmasi' ? 'Konfirmasi' : s, s === 'Batal' ? 'ban' : 'check', s === 'Batal' ? 'dng' : (s === 'Terkonfirmasi' || s === 'Hadir' || s === 'Selesai') ? 'pri' : ''));
   if (isAdmin()) add('hapus', 'Hapus', 'trash', 'dng');
   $('.box', m.el).appendChild(bar);
   bar.onclick = async e => {
     const b = e.target.closest('[data-a]'); if (!b) return; const a = b.dataset.a;
-    if (a === 'bukti') return cetakBukti(r, b); if (a === 'wa') return kirimWA(r);
+    if (a === 'bukti') return cetakBukti(r, b); if (a === 'share') return bagikanBukti(r, b); if (a === 'wa') return kirimWA(r);
     if (a === 'edit') { m.close(); return ubahCatatan(r, rerender); } if (a === 'jadwal') { m.close(); return jadwalUlang(r, rerender); }
     if (a === 'hapus') { const ok = await konfirmasi('Hapus data pendaftaran?', 'Data <b>' + esc(r.nama) + '</b> (' + esc(r.id) + ') akan dihapus permanen dan tidak dapat dikembalikan.', { bahaya: true, ok: 'Hapus permanen' }); if (!ok) return; const j = await tulis('daftar.delete', { id: r.id }); if (j) { invalidateCache(); m.close(); if (rerender) rerender('hapus', r); } return; }
     if (a.startsWith('st:')) { const ke = a.slice(3); let alasan; if (ke === 'Batal') { alasan = await konfirmasi('Batalkan booking?', 'Booking <b>' + esc(r.nama) + '</b> akan dibatalkan.', { alasan: 'Alasan pembatalan', bahaya: true, ok: 'Ya, batalkan' }); if (!alasan) return; } m.close(); await ubahStatus(r, ke, rerender, alasan); }
@@ -120,12 +142,12 @@ page('/', { title: 'Beranda', async render(el, p, q, ctx) {
     if (!D) return; const k = D.kpi; $('#hs').textContent = tglHari(D.tanggal) + (D.tanggal === todayStr() ? ' · hari ini' : '');
     const kp = (l, v, s, c) => '<div class="card kpi ' + (c || '') + '"><div class="l">' + l + '</div><div class="v">' + v + '</div><div class="s">' + s + '</div></div>';
     const dari = D.rows.filter(r => r.status !== 'Batal');
-    $('#dash').innerHTML = '<div class="grid g4">' + kp('Pasien hari ini', k.total, k.onsite + ' onsite · ' + k.appointment + ' appointment') + kp('Menunggu konfirmasi', k.menungguTotal, k.menunggu + ' untuk tanggal ini', 'warn') + kp('Sedang hadir', k.hadir, k.selesai + ' selesai', 'info') + kp('Bulan ini', k.sasaBulan + k.lamaBulan, k.sasaBulan + ' Sasa (baru) · ' + k.lamaBulan + ' lama', 'ok') + '</div>' +
-      '<div class="grid g12 mt"><div class="card"><div class="hd"><h3>Jadwal ' + (D.tanggal === todayStr() ? 'hari ini' : 'tanggal ini') + '</h3><a class="btn sm" href="#/antrean">Antrean ' + ic('right', 14) + '</a></div>' +
-      (D.rows.length ? '<div class="tw"><table class="t stack"><thead><tr><th>Jam</th><th>Antrean</th><th>Pasien</th><th>Dokter</th><th>Status</th><th></th></tr></thead><tbody>' + D.rows.map(r => '<tr class="cl" data-open="' + esc(r.id) + '"><td data-l="Jam" class="b">' + esc(jamTxt(r)) + '</td><td data-l="Antrean" class="b">' + esc(r.antrean || '—') + '</td><td data-l="Pasien"><div class="nm">' + esc(r.nama) + (r.sasa === 'Sasa' ? ' <span class="chip gold">SASA</span>' : '') + '</div><div class="sub">' + esc(r.jenis) + ' · ' + esc(r.kunjungan) + '</div></td><td data-l="Dokter">' + esc(r.dokter) + '</td><td data-l="Status">' + badge(r.status) + '</td><td class="nolbl right">' + tombolAksi(r) + '</td></tr>').join('') + '</tbody></table></div>' : '<div class="empty">' + ic('calendar', 34) + '<p>Belum ada pendaftaran pada tanggal ini.</p><a class="btn pri" href="#/daftar">' + ic('plus', 16) + ' Daftarkan pasien</a></div>') + '</div>' +
+    $('#dash').innerHTML = '<div class="grid g4">' + kp('Pasien hari ini', k.total, k.onsite + ' onsite · ' + k.appointment + ' appointment') + kp('Sesi pagi', dari.filter(r => r.sesi === 'Pagi').length, 'sebelum pukul 13:00', 'warn') + kp('Sesi sore', dari.filter(r => r.sesi === 'Sore').length, 'pukul 13:00 dan sesudahnya', 'info') + kp('Bulan ini', k.sasaBulan + k.lamaBulan, k.sasaBulan + ' Sasa (baru) · ' + k.lamaBulan + ' lama', 'ok') + '</div>' +
+      '<div class="grid g12 mt"><div class="card"><div class="hd"><h3>Jadwal ' + (D.tanggal === todayStr() ? 'hari ini' : 'tanggal ini') + '</h3><a class="btn sm" href="#/rekap">Rekap ' + ic('right', 14) + '</a></div>' +
+      (D.rows.length ? '<div class="tw"><table class="t stack"><thead><tr><th>Jam</th><th>Pasien</th><th>Dokter</th><th>Status</th><th></th></tr></thead><tbody>' + D.rows.map(r => '<tr class="cl" data-open="' + esc(r.id) + '"><td data-l="Jam" class="b">' + esc(jamTxt(r)) + '</td><td data-l="Pasien"><div class="nm">' + esc(r.nama) + (r.sasa === 'Sasa' ? ' <span class="chip gold">SASA</span>' : '') + '</div><div class="sub">' + esc(r.jenis) + ' · ' + esc(r.kunjungan) + '</div></td><td data-l="Dokter">' + esc(r.dokter) + '</td><td data-l="Status">' + badge(r.status) + '</td><td class="nolbl right">' + tombolAksi(r) + '</td></tr>').join('') + '</tbody></table></div>' : '<div class="empty">' + ic('calendar', 34) + '<p>Belum ada pendaftaran pada tanggal ini.</p><a class="btn pri" href="#/daftar">' + ic('plus', 16) + ' Daftarkan pasien</a></div>') + '</div>' +
       '<div class="col"><div class="card"><div class="hd"><h3>Dokter ' + (D.tanggal === todayStr() ? 'hari ini' : 'tanggal ini') + '</h3></div><div class="bd col" style="gap:14px">' + (D.dokter.length ? D.dokter.map(s => '<div class="row" style="justify-content:space-between"><div><b>' + esc(s.dokter) + '</b><div class="sm muted">' + esc(s.spesialis || '') + (s.ruang ? ' · ' + esc(s.ruang) : '') + '</div></div><span class="chip' + (s.jumlah ? ' gold' : '') + '">' + s.jumlah + ' pasien</span></div>').join('') : '<div class="muted">Belum ada dokter aktif.</div>') + '</div></div>' +
-      '<div class="card"><div class="hd"><h3>Menunggu konfirmasi</h3><a class="btn sm" href="#/konfirmasi">Semua</a></div>' + (D.menunggu.length ? D.menunggu.map(r => '<div class="qrow" data-open="' + esc(r.id) + '" style="cursor:pointer"><div class="grow"><div class="b">' + esc(r.nama) + '</div><div class="sm muted">' + esc(tglIndo(r.tgl, true) + ' · ' + jamTxt(r) + ' · ' + r.dokter) + '</div></div>' + tombolAksi(r) + '</div>').join('') : '<div class="empty" style="padding:26px">Semua booking sudah dikonfirmasi ' + ic('checkc', 16) + '</div>') + '</div></div></div>';
-    setBadge(k.menungguTotal);
+      '<div class="card"><div class="hd"><h3>Rekap pagi untuk asisten</h3></div><div class="bd col"><div class="sm muted">Daftar pasien hari ini beserta jadwal asisten, siap dikirim ke grup.</div><a class="btn gold" href="#/rekap">' + ic('list', 16) + ' Buka Rekap Hari Ini</a></div></div></div></div>';
+    if (fiturLama()) setBadge(k.menungguTotal);
   };
   const rerender = () => { render(); };
   pasangAksiBaris(el, () => (D ? D.rows.concat(D.menunggu) : []), () => { invalidateCache(); load(); });
@@ -176,7 +198,7 @@ page('/daftar', { title: 'Pendaftaran Baru', async render(el, p, q, ctx) {
   const ringkas = () => {
     if (S.hasil) return;
     const s = S.slots.find(x => x.dokterId === S.slot); const jm = $('#fjam') && $('#fjam').value; const nama = S.mode === 'lama' ? (S.pasien && S.pasien.nama) : ($('#pn') && $('#pn').value.trim());
-    $('#rail').innerHTML = S.hasil ? '' : '<div class="ticket"><div class="k">Ringkasan pendaftaran</div><div class="tcode" style="margin:6px 0 0">' + (S.kunj === 'Onsite' ? 'ONSITE' : 'BOOKING') + '</div><dl><dt>Pasien</dt><dd>' + esc(nama || '—') + '</dd><dt>Status</dt><dd>' + (S.mode === 'baru' ? 'Baru · kartu SASA' : 'Pasien lama') + '</dd><dt>Dokter</dt><dd>' + esc(s ? s.dokter : '—') + '</dd><dt>Tanggal</dt><dd>' + esc(tglIndo(S.tgl)) + '</dd><dt>Jam</dt><dd>' + esc(jm ? jm + ' WIB' : '—') + '</dd></dl></div>' + (S.kunj === 'Appointment' ? '<p class="hint" style="margin-top:10px">Booking berstatus <b>Menunggu</b> hingga dikonfirmasi. Notifikasi dikirim otomatis bila WhatsApp/Email aktif.</p>' : '<p class="hint" style="margin-top:10px">Onsite langsung berstatus <b>Hadir</b> dan mendapat nomor antrean.</p>');
+    $('#rail').innerHTML = S.hasil ? '' : '<div class="ticket"><div class="k">Ringkasan pendaftaran</div><div class="tcode" style="margin:6px 0 0">' + (S.kunj === 'Onsite' ? 'ONSITE' : 'BOOKING') + '</div><dl><dt>Pasien</dt><dd>' + esc(nama || '—') + '</dd><dt>Status</dt><dd>' + (S.mode === 'baru' ? 'Baru · kartu SASA' : 'Pasien lama') + '</dd><dt>Dokter</dt><dd>' + esc(s ? s.dokter : '—') + '</dd><dt>Tanggal</dt><dd>' + esc(tglIndo(S.tgl)) + '</dd><dt>Jam</dt><dd>' + esc(jm ? jm + ' WIB' : '—') + '</dd></dl></div>' + (S.kunj === 'Appointment' ? '<p class="hint" style="margin-top:10px">Setelah disimpan, bukti booking bisa langsung dikirim ke pasien lewat WhatsApp.</p>' : '<p class="hint" style="margin-top:10px">Pasien Onsite dicatat untuk hari ini dengan jam sekarang.</p>');
   };
   const kosongkan = () => { S.slot = null; S.pasien = null; S.hasil = null; S.reqId = uid(); $('#fj').value = ''; $('#fc').value = ''; $('#fjam').value = S.kunj === 'Onsite' ? jamNow() : ''; bagianPasien(); renderSlot(); ringkas(); };
   el.addEventListener('click', e => {
@@ -208,8 +230,8 @@ page('/daftar', { title: 'Pendaftaran Baru', async render(el, p, q, ctx) {
     const j = await tulis('daftar.save', d, { reqId: S.reqId }); S.busy = false; btnBusy(b, false);
     if (!j) { if (S.slot) muatSlot(); return; }
     invalidateCache(); const bk = j.data.booking; S.hasil = bk;
-    $('#rail').innerHTML = '<div class="ticket"><div class="k">' + (bk.kunjungan === 'Onsite' ? 'Pasien hadir · antrean' : 'Booking tersimpan') + '</div><div class="tcode">' + esc(bk.kunjungan === 'Onsite' ? bk.antrean : bk.id) + '</div><dl><dt>Pasien</dt><dd>' + esc(bk.nama) + '</dd><dt>No. RM</dt><dd>' + esc(bk.rm) + '</dd><dt>Dokter</dt><dd>' + esc(bk.dokter) + '</dd><dt>Jadwal</dt><dd>' + esc(tglIndo(bk.tgl, true) + ' · ' + jamTxt(bk) + ' WIB') + '</dd><dt>Status</dt><dd>' + esc(bk.status) + '</dd>' + (bk.sasa === 'Sasa' ? '<dt>Kartu</dt><dd style="color:var(--gold-h)">SASA baru ★</dd>' : '') + '</dl></div><div class="col" style="margin-top:12px"><button class="btn blk" id="r-pdf">' + ic('file', 16) + ' Bukti booking (PDF)</button><button class="btn blk" id="r-wa">' + ic('wa', 16) + ' Kirim lewat WhatsApp</button><button class="btn pri blk" id="r-new">' + ic('plus', 16) + ' Pendaftaran berikutnya</button></div>';
-    $('#r-pdf').onclick = ev => cetakBukti(bk, ev.currentTarget); $('#r-wa').onclick = () => kirimWA(bk); $('#r-new').onclick = () => { kosongkan(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+    $('#rail').innerHTML = '<div class="ticket"><div class="k">Pendaftaran tersimpan ' + ic('checkc', 14) + '</div><div class="tcode">' + esc(bk.id) + '</div><dl><dt>Pasien</dt><dd>' + esc(bk.nama) + '</dd><dt>No. RM</dt><dd>' + esc(bk.rm) + '</dd><dt>Dokter</dt><dd>' + esc(bk.dokter) + '</dd><dt>Jadwal</dt><dd>' + esc(tglIndo(bk.tgl, true) + ' · ' + jamTxt(bk) + ' WIB') + '</dd>' + (bk.sasa === 'Sasa' ? '<dt>Kartu</dt><dd style="color:var(--gold-h)">SASA baru ★</dd>' : '') + '</dl></div><div class="col" style="margin-top:12px"><button class="btn gold blk" id="r-wa" style="min-height:48px">' + ic('wa', 18) + ' Kirim bukti ke WhatsApp</button><button class="btn blk" id="r-pdf">' + ic('file', 16) + ' Unduh PDF</button><button class="btn blk" id="r-cp">' + ic('copy', 16) + ' Salin pesan</button><button class="btn blk ghost" id="r-new">' + ic('plus', 16) + ' Pendaftaran berikutnya</button></div>';
+    $('#r-wa').onclick = ev => bagikanBukti(bk, ev.currentTarget); $('#r-pdf').onclick = ev => cetakBukti(bk, ev.currentTarget); $('#r-cp').onclick = () => copyText(pesanBukti(bk)); $('#r-new').onclick = () => { kosongkan(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
     if (window.innerWidth < 1000) $('#rail').scrollIntoView({ behavior: 'smooth' });
     S.slots = []; muatSlot();
   };
