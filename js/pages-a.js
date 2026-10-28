@@ -76,7 +76,7 @@ function bukaDetail(r, rerender) {
   const bar = document.createElement('div'); bar.className = 'mf';
   const add = (id, label, ico, cls) => { const b = document.createElement('button'); b.className = 'btn ' + (cls || ''); b.dataset.a = id; b.innerHTML = ic(ico, 16) + ' ' + label; bar.appendChild(b); };
   if (r.status !== 'Batal') { add('share', 'Kirim bukti', 'wa', 'pri'); add('bukti', 'Unduh PDF', 'file'); }
-  add('edit', 'Ubah catatan', 'edit');
+  add('edit', 'Ubah data', 'edit');
   if (['Terdaftar', 'Menunggu', 'Terkonfirmasi'].includes(r.status)) add('jadwal', 'Jadwal ulang', 'calendar');
   st.forEach(s => add('st:' + s, s === 'Batal' ? 'Batalkan' : s === 'Menunggu' && r.status === 'Batal' ? 'Aktifkan kembali' : s === 'Menunggu' ? 'Kembali ke menunggu' : s === 'Hadir' ? 'Check-in' : s === 'Terkonfirmasi' ? 'Konfirmasi' : s, s === 'Batal' ? 'ban' : 'check', s === 'Batal' ? 'dng' : (s === 'Terkonfirmasi' || s === 'Hadir' || s === 'Selesai') ? 'pri' : ''));
   if (isAdmin()) add('hapus', 'Hapus', 'trash', 'dng');
@@ -90,9 +90,27 @@ function bukaDetail(r, rerender) {
   };
 }
 function ubahCatatan(r, rerender) {
-  const jenis = (App.boot.referensi['Jenis Pasien'] || []);
-  modal({ title: 'Ubah data booking', size: 'sm', body: '<div class="col"><div class="f"><label>Jenis pasien / penjamin</label><select class="in" id="uc-j">' + opt(jenis, r.jenis) + '</select></div><div class="f"><label>Catatan</label><textarea class="in" id="uc-c" maxlength="500">' + esc(r.catatan) + '</textarea></div></div>',
-    buttons: [{ t: 'Batal', v: null }, { t: 'Simpan', c: 'pri', fn: async el => { const j = await tulis('daftar.update', { id: r.id, catatan: $('#uc-c', el).value, jenisPasien: $('#uc-j', el).value }); if (!j) return false; Object.assign(r, j.data); invalidateCache(); if (rerender) rerender(); return true; } }] });
+  const jenis = (App.boot.referensi['Jenis Pasien'] || []), dks = ((App.boot && App.boot.dokter) || []).filter(d => d.Aktif !== 'TIDAK' || d.ID_Dokter === r.dokterId);
+  const f = (id, label, val, extra) => '<div class="f"><label for="' + id + '">' + label + '</label><input class="in" id="' + id + '" value="' + esc(val || '') + '" ' + (extra || '') + '></div>';
+  modal({ title: 'Ubah data — ' + r.nama, size: 'lg', body: '<div class="fg">' +
+    f('uc-n', 'Nama pasien <i>*</i>', r.nama) + f('uc-rm', 'No. RM', r.rm) + f('uc-nik', 'NIK', r.nik, 'inputmode="numeric" maxlength="16"') + f('uc-hp', 'No. WhatsApp', r.hp, 'inputmode="tel"') +
+    '<div class="f full"><label for="uc-al">Alamat</label><input class="in" id="uc-al" value="' + esc(r.alamat || '') + '"></div>' +
+    '<div class="f"><label for="uc-d">Dokter</label><select class="in" id="uc-d">' + dks.map(d => '<option value="' + esc(d.ID_Dokter) + '"' + (d.ID_Dokter === r.dokterId ? ' selected' : '') + '>' + esc(d.Nama_Dokter) + '</option>').join('') + '</select></div>' +
+    '<div class="f"><label for="uc-j">Jenis pasien / penjamin</label><select class="in" id="uc-j">' + opt(jenis, r.jenis) + '</select></div>' +
+    '<div class="f"><label for="uc-t">Tanggal kunjungan</label><input class="in" type="date" id="uc-t" value="' + esc(r.tgl) + '"></div>' +
+    '<div class="f"><label for="uc-jm">Jam kunjungan</label><input class="in" type="time" id="uc-jm" value="' + esc(r.jam || '') + '"></div>' +
+    '<div class="f"><label for="uc-k">Jenis kunjungan</label><select class="in" id="uc-k"><option' + (r.kunjungan === 'Appointment' ? ' selected' : '') + '>Appointment</option><option' + (r.kunjungan === 'Onsite' ? ' selected' : '') + '>Onsite</option></select></div>' +
+    '<div class="f"><label for="uc-s">Sasa / Lama</label><select class="in" id="uc-s"><option value="Sasa"' + (r.sasa === 'Sasa' ? ' selected' : '') + '>Sasa (pasien baru)</option><option value="Lama"' + (r.sasa !== 'Sasa' ? ' selected' : '') + '>Lama</option></select></div>' +
+    '<div class="f full"><label for="uc-c">Catatan</label><textarea class="in" id="uc-c" maxlength="500">' + esc(r.catatan) + '</textarea></div></div>',
+    buttons: [{ t: 'Batal', v: null }, { t: 'Simpan', c: 'pri', fn: async el => {
+      const g = id => $('#' + id, el).value; clearErr(el);
+      if (g('uc-n').trim().length < 3) { fieldErr($('#uc-n', el), 'Nama wajib diisi.'); return false; }
+      if (g('uc-hp').trim() && !hpOk(g('uc-hp'))) { fieldErr($('#uc-hp', el), 'Nomor WhatsApp tidak valid.'); return false; }
+      if (g('uc-nik').trim() && !nikOk(g('uc-nik'))) { fieldErr($('#uc-nik', el), 'NIK harus 16 digit.'); return false; }
+      if (!g('uc-t')) { fieldErr($('#uc-t', el), 'Tanggal wajib diisi.'); return false; }
+      if (g('uc-jm') && !/^([01]\d|2[0-3]):[0-5]\d$/.test(g('uc-jm'))) { fieldErr($('#uc-jm', el), 'Jam tidak valid.'); return false; }
+      const j = await tulis('daftar.update', { id: r.id, nama: g('uc-n'), rm: g('uc-rm'), nik: g('uc-nik'), hp: g('uc-hp'), alamat: g('uc-al'), dokterId: g('uc-d'), jenisPasien: g('uc-j'), tanggal: g('uc-t'), jam: g('uc-jm'), kunjungan: g('uc-k'), sasa: g('uc-s'), catatan: g('uc-c') });
+      if (!j) return false; Object.assign(r, j.data); invalidateCache(); if (rerender) rerender(); return true; } }] });
 }
 const jamTxt = r => r.jam || (r.sesi === 'Pagi' ? '08:00' : r.sesi === 'Sore' ? '16:00' : '—');
 const jamNow = () => { const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' })); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };

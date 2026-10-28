@@ -17,7 +17,7 @@ const Rekap = (function () {
   /** Gambar tabel ala spreadsheet (Sasa/Lama, Tanggal, Pagi, Sore, Dokter, Pasien). */
   async function gambar(tgl, rows) {
     try { await Promise.all(['600 20px "EB Garamond"', '500 14px "EB Garamond"'].map(f => document.fonts.load(f))); } catch (e) { /* font cadangan */ }
-    const S = 2, kol = [{ h: 'Sasa/Lama', w: 84 }, { h: 'Tanggal', w: 112 }, { h: 'Pagi', w: 92 }, { h: 'Sore', w: 92 }, { h: 'Dokter', w: 262 }, { h: 'Pasien', w: 300 }];
+    const S = 2, kol = [{ h: 'Tanggal', w: 104 }, { h: 'Pagi', w: 84 }, { h: 'Sore', w: 84 }, { h: 'Dokter', w: 240 }, { h: 'Pasien', w: 250 }, { h: 'Catatan', w: 238 }];
     const W = kol.reduce((a, k) => a + k.w, 0), RH = 30, TH = 52, HH = 28, H = TH + HH + Math.max(rows.length, 1) * RH + 1;
     const cv = document.createElement('canvas'); cv.width = W * S; cv.height = H * S; const c = cv.getContext('2d'); c.scale(S, S);
     const SERIF = '"EB Garamond", "Times New Roman", Georgia, serif';
@@ -29,12 +29,12 @@ const Rekap = (function () {
     let x = 0; c.fillStyle = '#EFE6CF'; c.fillRect(0, TH, W, HH);
     c.fillStyle = '#0B192C'; c.font = '600 13px ' + SERIF; c.textAlign = 'center'; kol.forEach(k => { c.fillText(k.h, x + k.w / 2, TH + HH / 2); x += k.w; });
     rows.forEach((r, i) => {
-      const y = TH + HH + i * RH, ses = tarikSesi(r), cells = [r.sasa === 'Sasa' ? 'Sasa' : 'Lama', tglPendek(r.tgl), ses === 'Pagi' ? jamR(r) : '', ses === 'Sore' ? jamR(r) : '', r.dokter, String(r.nama).toUpperCase()];
+      const y = TH + HH + i * RH, ses = tarikSesi(r), cells = [tglPendek(r.tgl), ses === 'Pagi' ? jamR(r) : '', ses === 'Sore' ? jamR(r) : '', r.dokter, String(r.nama).toUpperCase(), String(r.catatan || '').replace(/\s+/g, ' ')];
       let cx = 0; kol.forEach((k, j) => {
-        if (j === 2 && cells[j]) { c.fillStyle = '#A9EBA0'; c.fillRect(cx, y, k.w, RH); }
-        if (j === 3 && cells[j]) { c.fillStyle = '#FFE680'; c.fillRect(cx, y, k.w, RH); }
-        c.fillStyle = '#111'; c.font = (j >= 2 && j <= 3 && cells[j] ? '600 ' : '500 ') + '14px ' + SERIF; c.textAlign = j >= 4 ? 'left' : 'center';
-        let t = cells[j]; const px = j >= 4 ? cx + 8 : cx + k.w / 2, mx = k.w - 14; if (j >= 4) { while (t.length > 1 && c.measureText(t).width > mx) t = t.slice(0, -1); }
+        if (j === 1 && cells[j]) { c.fillStyle = '#A9EBA0'; c.fillRect(cx, y, k.w, RH); }
+        if (j === 2 && cells[j]) { c.fillStyle = '#FFE680'; c.fillRect(cx, y, k.w, RH); }
+        c.fillStyle = '#111'; c.font = (j >= 1 && j <= 2 && cells[j] ? '600 ' : '500 ') + '14px ' + SERIF; c.textAlign = j >= 3 ? 'left' : 'center';
+        let t = cells[j]; const px = j >= 3 ? cx + 8 : cx + k.w / 2, mx = k.w - 14; if (j >= 3) { while (t.length > 1 && c.measureText(t).width > mx) t = t.slice(0, -1); }
         c.fillText(t, px, y + RH / 2 + 1); cx += k.w;
       });
     });
@@ -58,7 +58,7 @@ const Rekap = (function () {
     const lis = () => { $('#rl').innerHTML = S.as.length ? S.as.map((a, i) => '<div style="display:grid;grid-template-columns:1fr 1fr 34px;gap:6px;align-items:center"><input class="in" style="padding:0 8px;font-size:13px;min-width:0" data-n="' + i + '" value="' + esc(a.nama) + '" placeholder="Nama"><input class="in" data-j="' + i + '" value="' + esc(a.jam) + '" placeholder="07.00-09.00" style="padding:0 8px;font-size:13px;min-width:0"><button class="btn sm ico" data-x="' + i + '" aria-label="Hapus">' + ic('x', 14) + '</button></div>').join('') : '<div class="muted sm">Belum ada asisten.</div>'; };
     const tabel = () => {
       $('#rc').textContent = S.rows.length + ' pasien';
-      $('#rtb').innerHTML = S.rows.length ? '<div class="tw"><table class="t"><thead><tr><th>Sasa/Lama</th><th>Tanggal</th><th>Pagi</th><th>Sore</th><th>Dokter</th><th>Pasien</th></tr></thead><tbody>' + S.rows.map(r => { const s = tarikSesi(r); return '<tr><td>' + esc(r.sasa) + '</td><td class="nowrap">' + esc(tglPendek(r.tgl)) + '</td><td class="b" style="' + (s === 'Pagi' ? 'background:#C9F3C2' : '') + '">' + (s === 'Pagi' ? esc(jamR(r)) : '') + '</td><td class="b" style="' + (s === 'Sore' ? 'background:#FFEFA0' : '') + '">' + (s === 'Sore' ? esc(jamR(r)) : '') + '</td><td>' + esc(r.dokter) + '</td><td class="b">' + esc(String(r.nama).toUpperCase()) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<div class="empty">' + ic('calendar', 34) + '<p>Belum ada pendaftaran pada tanggal ini.</p></div>';
+      $('#rtb').innerHTML = S.rows.length ? '<div class="tw"><table class="t"><thead><tr><th>Tanggal</th><th>Pagi</th><th>Sore</th><th>Dokter</th><th>Pasien</th><th>Catatan</th></tr></thead><tbody>' + S.rows.map(r => { const s = tarikSesi(r); return '<tr class="cl" data-open="' + esc(r.id) + '"><td class="nowrap">' + esc(tglPendek(r.tgl)) + '</td><td class="b" style="' + (s === 'Pagi' ? 'background:#C9F3C2' : '') + '">' + (s === 'Pagi' ? esc(jamR(r)) : '') + '</td><td class="b" style="' + (s === 'Sore' ? 'background:#FFEFA0' : '') + '">' + (s === 'Sore' ? esc(jamR(r)) : '') + '</td><td>' + esc(r.dokter) + '</td><td class="b">' + esc(String(r.nama).toUpperCase()) + (r.sasa === 'Sasa' ? ' <span class="chip gold">SASA</span>' : '') + '</td><td class="muted">' + esc(r.catatan || '') + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<div class="empty">' + ic('calendar', 34) + '<p>Belum ada pendaftaran pada tanggal ini.</p></div>';
     };
     const muat = async () => {
       $('#rd').value = S.tgl; $('#rh').textContent = hariDari(S.tgl) + ', ' + tglIndo(S.tgl);
@@ -74,7 +74,8 @@ const Rekap = (function () {
       simpanAsistenHari(S.tgl, S.as); sync();
     });
     el.addEventListener('click', async e => {
-      const x = e.target.closest('[data-x]'); if (x) { S.as.splice(+x.dataset.x, 1); simpanAsistenHari(S.tgl, S.as); lis(); sync(); return; }
+      const op = e.target.closest('tr[data-open]'); if (op && !e.target.closest('button,a,input')) { const r = S.rows.find(x => x.id === op.dataset.open); if (r) bukaDetail(r, () => muat()); return; }
+    const x = e.target.closest('[data-x]'); if (x) { S.as.splice(+x.dataset.x, 1); simpanAsistenHari(S.tgl, S.as); lis(); sync(); return; }
       if (e.target.closest('#ra')) { S.as.push({ nama: '', jam: '' }); simpanAsistenHari(S.tgl, S.as); lis(); sync(); const k = $$('[data-n]', el); if (k.length) k[k.length - 1].focus(); return; }
       if (e.target.closest('#rd0')) { try { localStorage.removeItem(kunciAs(S.tgl)); } catch (er) { /* abaikan */ } S.as = asistenHari(S.tgl); lis(); sync(); return; }
       if (e.target.closest('#rsb')) { const b = e.target.closest('#rsb'); btnBusy(b, true); const j = await tulis('config.save', { ASISTEN: JSON.stringify(S.as.filter(a => a.nama)) }); btnBusy(b, false); if (j) await refreshBoot(); return; }

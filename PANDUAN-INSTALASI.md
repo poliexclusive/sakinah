@@ -97,6 +97,10 @@ Cara kirim dari HP: buka aplikasi di HP Polex, simpan pendaftaran, ketuk **Kirim
 
 Catatan: perubahan jadwal asisten per hari tersimpan di perangkat yang dipakai; hanya *bawaan* yang tersimpan di server.
 
+## UPDATE — Rekap dengan Catatan & Ubah data lengkap
+
+Ganti `Pendaftaran.gs` di Apps Script, lalu **Manage deployments → New version**. Salin ZIP ke repository (jangan timpa `js/config.js`), lalu `git add .`, `git commit`, `git push`. Di Rekap Hari Ini, klik baris pasien untuk membuka detail; tombol **Ubah data** mengubah semua isian (nama, RM, NIK, WhatsApp, alamat, dokter, tanggal, jam, penjamin, jenis kunjungan, Sasa/Lama, catatan).
+
 ## Cara pakai singkat
 
 - **Pendaftaran Baru**: pilih Appointment/Onsite → tanggal → jam kunjungan (bebas, format 24 jam) & dokter → pasien terdaftar *atau* pasien baru (otomatis kartu **SASA**) → penjamin → **F4** simpan. Onsite langsung *Hadir* + nomor antrean.
