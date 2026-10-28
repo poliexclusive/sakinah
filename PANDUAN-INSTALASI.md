@@ -109,6 +109,14 @@ Ganti `Pendaftaran.gs` di Apps Script, lalu **Manage deployments → New version
 
 Formulir pendaftaran: pilih dokter lewat kolom yang bisa diketik, isi data pasien, pilih **Sasa/Lama** dan penjamin. **No. RM dibiarkan kosong bila tidak diisi** (tidak lagi dibuat otomatis). Kolom *Cari pasien terdaftar* bersifat opsional untuk mengisi data otomatis.
 
+## UPDATE — Jam tersimpan benar, HP & Sasa/Lama boleh kosong, kirim langsung ke nomor
+
+1. Ganti `Kode.gs` dan `Pendaftaran.gs` di Apps Script, lalu **Manage deployments → New version**.
+2. Salin ZIP ke repository (**jangan timpa `js/config.js`**), `git add .`, `git commit`, `git push`, Ctrl+F5.
+3. Kolom **Jam** kini dibuat otomatis di sheet Pendaftaran bila belum ada (tidak perlu `migrasiSkema`). Pendaftaran lama yang dibuat sebelum kolom ini ada tidak punya jam tersimpan, sehingga tampil sebagai *Pagi* atau *Sore*. Klik pasien → **Ubah data** → isi jam yang benar.
+4. No. WhatsApp dan Sasa/Lama boleh dikosongkan saat mendaftar; isi lewat **Ubah data** ketika pasien datang.
+5. Tombol **Kirim ke WhatsApp [nomor]** membuka chat langsung ke nomor pasien dengan pesan terisi; PDF terunduh, lalu lampirkan lewat 📎 → Dokumen. Tanpa nomor, tombol memakai menu bagikan HP (pilih kontak).
+
 ## Cara pakai singkat
 
 - **Pendaftaran Baru**: pilih Appointment/Onsite → tanggal → jam kunjungan (bebas, format 24 jam) & dokter → pasien terdaftar *atau* pasien baru (otomatis kartu **SASA**) → penjamin → **F4** simpan. Onsite langsung *Hadir* + nomor antrean.

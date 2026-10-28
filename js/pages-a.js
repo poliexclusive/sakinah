@@ -53,17 +53,20 @@ async function cetakBukti(r, btn) {
   catch (e) { toast('Bukti belum dapat dibuat: ' + (e && e.message || e), 'err'); }
   btnBusy(btn, false);
 }
-/** Satu ketukan: PDF + pesan ke WhatsApp. HP memakai menu bagikan; komputer mengunduh PDF, menyalin pesan, dan membuka chat. */
-async function bagikanBukti(r, btn) {
+/** Kirim bukti. Bila ada nomor pasien: langsung membuka chat nomor itu (pesan terisi) dan PDF diunduh untuk dilampirkan. Tanpa nomor: menu bagikan HP / unduh di komputer. */
+async function bagikanBukti(r, btn, pilihKontak) {
   btnBusy(btn, true);
   try {
     const blob = await buatBuktiBlob(r), teks = pesanBukti(r), file = new File([blob], namaBerkas(r), { type: 'application/pdf' });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    const punya = !!hp(r.hp) && !pilihKontak;
+    if (!punya && navigator.canShare && navigator.canShare({ files: [file] })) {
       try { await navigator.share({ files: [file], text: teks }); btnBusy(btn, false); return; } catch (e) { if (e && e.name === 'AbortError') { btnBusy(btn, false); return; } }
     }
     unduh(file.name, blob); copyText(teks);
-    toast('PDF diunduh dan pesan disalin. Lampirkan PDF di chat WhatsApp.', 'ok');
-    window.open(linkWA(r, teks), '_blank');
+    if (punya) {
+      window.open(linkWA(r, teks), '_blank');
+      toast('Chat ' + r.hp + ' dibuka dengan pesan siap kirim. Lampirkan PDF: ketuk 📎 → Dokumen → pilih ' + file.name, 'ok');
+    } else toast('PDF diunduh dan pesan disalin. Pasien belum punya nomor WhatsApp: lampirkan PDF di chat yang dipilih.', 'ok');
   } catch (e) { toast('Gagal menyiapkan bukti: ' + (e && e.message || e), 'err'); }
   btnBusy(btn, false);
 }
@@ -100,7 +103,7 @@ function ubahCatatan(r, rerender) {
     '<div class="f"><label for="uc-t">Tanggal kunjungan</label><input class="in" type="date" id="uc-t" value="' + esc(r.tgl) + '"></div>' +
     '<div class="f"><label for="uc-jm">Jam kunjungan</label><input class="in" type="time" id="uc-jm" value="' + esc(r.jam || '') + '"></div>' +
     '<div class="f"><label for="uc-k">Jenis kunjungan</label><select class="in" id="uc-k"><option' + (r.kunjungan === 'Appointment' ? ' selected' : '') + '>Appointment</option><option' + (r.kunjungan === 'Onsite' ? ' selected' : '') + '>Onsite</option></select></div>' +
-    '<div class="f"><label for="uc-s">Sasa / Lama</label><select class="in" id="uc-s"><option value="Sasa"' + (r.sasa === 'Sasa' ? ' selected' : '') + '>Sasa (pasien baru)</option><option value="Lama"' + (r.sasa !== 'Sasa' ? ' selected' : '') + '>Lama</option></select></div>' +
+    '<div class="f"><label for="uc-s">Sasa / Lama</label><select class="in" id="uc-s"><option value=""' + (!r.sasa ? ' selected' : '') + '>— Belum diisi —</option><option value="Sasa"' + (r.sasa === 'Sasa' ? ' selected' : '') + '>Sasa (pasien baru)</option><option value="Lama"' + (r.sasa === 'Lama' ? ' selected' : '') + '>Lama</option></select></div>' +
     '<div class="f full"><label for="uc-c">Catatan</label><textarea class="in" id="uc-c" maxlength="500">' + esc(r.catatan) + '</textarea></div></div>',
     buttons: [{ t: 'Batal', v: null }, { t: 'Simpan', c: 'pri', fn: async el => {
       const g = id => $('#' + id, el).value; clearErr(el);
@@ -112,7 +115,7 @@ function ubahCatatan(r, rerender) {
       const j = await tulis('daftar.update', { id: r.id, nama: g('uc-n'), rm: g('uc-rm'), nik: g('uc-nik'), hp: g('uc-hp'), alamat: g('uc-al'), dokterId: g('uc-d'), jenisPasien: g('uc-j'), tanggal: g('uc-t'), jam: g('uc-jm'), kunjungan: g('uc-k'), sasa: g('uc-s'), catatan: g('uc-c') });
       if (!j) return false; Object.assign(r, j.data); invalidateCache(); if (rerender) rerender(); return true; } }] });
 }
-const jamTxt = r => r.jam || (r.sesi === 'Pagi' ? '08:00' : r.sesi === 'Sore' ? '16:00' : '—');
+const jamTxt = r => r.jam || r.sesi || '—';   // data lama tanpa jam tampil sebagai Pagi/Sore
 const jamNow = () => { const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' })); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
 function jadwalUlang(r, rerender) {
   const m = modal({ title: 'Jadwal ulang — ' + r.nama, body: '<div class="col"><div class="fg"><div class="f"><label>Tanggal baru</label><input class="in" type="date" id="ju-t" min="' + (isAdmin() ? '' : todayStr()) + '" value="' + esc(r.tgl) + '"></div><div class="f"><label>Jam kunjungan</label><input class="in" type="time" id="ju-j" value="' + esc(r.jam || '') + '"></div></div><div class="f"><label>Dokter</label><select class="in" id="ju-s"><option>Memuat…</option></select></div><div class="hint">Pasien akan diberi tahu lewat WhatsApp/Email bila notifikasi aktif.</div></div>',
@@ -184,14 +187,14 @@ page('/daftar', { title: 'Pendaftaran Baru', async render(el, p, q, ctx) {
     '<div class="card pad"><div class="row wrap" style="justify-content:space-between"><div><div class="lbl">1 · Jenis kunjungan</div><div class="seg mt" style="margin-top:6px" id="sk"><button data-k="Appointment" class="on">Appointment</button><button data-k="Onsite">Onsite (langsung datang)</button></div></div><div class="f" style="min-width:210px"><label>Tanggal kunjungan</label><input class="in" type="date" id="ft" value="' + S.tgl + '" min="' + (isAdmin() ? '' : todayStr()) + '"></div></div><div class="hint" style="margin-top:8px" id="th"></div></div>' +
     '<div class="card pad"><div class="lbl">2 · Dokter & jam kunjungan</div><div class="f" style="max-width:220px;margin-top:10px"><label for="fjam">Jam kunjungan (WIB) <i>*</i></label><input class="in" type="time" id="fjam" step="60"></div><div class="hint" id="jh" style="margin:6px 0 10px">Jam bebas sesuai kesepakatan dengan pasien.</div><div id="sg">' + skel(2, 70) + '</div></div>' +
     '<div class="card pad"><div class="lbl">3 · Data pasien</div><div id="pb" class="mt" style="margin-top:14px"></div></div>' +
-    '<div class="card pad"><div class="lbl">4 · Penjamin & catatan</div><div class="fg mt" style="margin-top:10px"><div class="f"><label for="fsl">Sasa / Lama <i>*</i></label><select class="in" id="fsl"><option value="Lama">Lama (pasien lama)</option><option value="Sasa">Sasa (pasien baru, kartu SASA)</option></select></div><div class="f"><label for="fj">Jenis pasien / penjamin <i>*</i></label><select class="in" id="fj">' + opt(jenis, '', 'Pilih…') + '</select></div><div class="f"><label for="fc">Catatan</label><input class="in" id="fc" maxlength="500" placeholder="Opsional, mis. keluhan / permintaan khusus"></div></div></div>' +
+    '<div class="card pad"><div class="lbl">4 · Penjamin & catatan</div><div class="fg mt" style="margin-top:10px"><div class="f"><label for="fsl">Sasa / Lama <span class="muted">(boleh kosong, isi saat pasien datang)</span></label><select class="in" id="fsl"><option value="">— Belum diisi —</option><option value="Lama">Lama (pasien lama)</option><option value="Sasa">Sasa (pasien baru, kartu SASA)</option></select></div><div class="f"><label for="fj">Jenis pasien / penjamin <i>*</i></label><select class="in" id="fj">' + opt(jenis, '', 'Pilih…') + '</select></div><div class="f"><label for="fc">Catatan</label><input class="in" id="fc" maxlength="500" placeholder="Opsional, mis. keluhan / permintaan khusus"></div></div></div>' +
     '<div class="row" style="justify-content:flex-end;gap:10px"><button class="btn" id="fr">Kosongkan</button><button class="btn gold" id="fs" style="min-width:200px;min-height:46px">' + ic('check', 18) + ' Simpan pendaftaran <kbd class="deskonly" style="margin-left:4px">F4</kbd></button></div></div>' +
     '<aside class="rail" id="rail"></aside></div>';
   if (window.innerWidth < 1000) $('#dg').style.gridTemplateColumns = '1fr';
   const bagianPasien = () => {
     $('#pb').innerHTML = '<div class="f" style="position:relative;margin-bottom:14px"><label for="ps">Cari pasien terdaftar <span class="muted">(opsional, mengisi data otomatis)</span></label><input class="in" id="ps" placeholder="Nama, No. RM, NIK, atau No. HP…" autocomplete="off"><div class="sugg hide" id="sg2" role="listbox"></div><div id="pc" class="hide" style="margin-top:8px"></div></div>' +
-      '<div class="fg"><div class="f full"><label for="pn">Nama lengkap <i>*</i></label><input class="in" id="pn" autocomplete="off" maxlength="100"></div><div class="f"><label for="ph">No. WhatsApp <i>*</i></label><input class="in" id="ph" inputmode="tel" placeholder="08xxxxxxxxxx"></div><div class="f"><label for="pk">NIK (16 digit)</label><input class="in" id="pk" inputmode="numeric" maxlength="16"></div><div class="f"><label for="pt">Tanggal lahir</label><input class="in" id="pt" type="date" max="' + todayStr() + '"></div><div class="f"><label for="pj">Jenis kelamin</label><select class="in" id="pj"><option value="">—</option><option>Laki-laki</option><option>Perempuan</option></select></div><div class="f"><label for="pe">Email</label><input class="in" id="pe" type="email"></div><div class="f"><label for="pr">No. RM (diisi dari SIMRS)</label><input class="in" id="pr" maxlength="30"></div><div class="f full"><label for="pa">Alamat</label><input class="in" id="pa" maxlength="200"></div></div>';
-    $('#fsl') && ($('#fsl').value = 'Lama'); pasangCari();
+      '<div class="fg"><div class="f full"><label for="pn">Nama lengkap <i>*</i></label><input class="in" id="pn" autocomplete="off" maxlength="100"></div><div class="f"><label for="ph">No. WhatsApp <span class="muted">(boleh kosong)</span></label><input class="in" id="ph" inputmode="tel" placeholder="08xxxxxxxxxx"></div><div class="f"><label for="pk">NIK (16 digit)</label><input class="in" id="pk" inputmode="numeric" maxlength="16"></div><div class="f"><label for="pt">Tanggal lahir</label><input class="in" id="pt" type="date" max="' + todayStr() + '"></div><div class="f"><label for="pj">Jenis kelamin</label><select class="in" id="pj"><option value="">—</option><option>Laki-laki</option><option>Perempuan</option></select></div><div class="f"><label for="pe">Email</label><input class="in" id="pe" type="email"></div><div class="f"><label for="pr">No. RM (diisi dari SIMRS)</label><input class="in" id="pr" maxlength="30"></div><div class="f full"><label for="pa">Alamat</label><input class="in" id="pa" maxlength="200"></div></div>';
+    $('#fsl') && ($('#fsl').value = ''); pasangCari();
   };
   function isiPasien(x) {
     const set = (id, v) => { const e = $('#' + id); if (e) e.value = v || ''; };
@@ -226,7 +229,7 @@ page('/daftar', { title: 'Pendaftaran Baru', async render(el, p, q, ctx) {
   const ringkas = () => {
     if (S.hasil) return;
     const s = S.slots.find(x => x.dokterId === S.slot); const jm = $('#fjam') && $('#fjam').value; const nama = $('#pn') && $('#pn').value.trim();
-    $('#rail').innerHTML = S.hasil ? '' : '<div class="ticket"><div class="k">Ringkasan pendaftaran</div><div class="tcode" style="margin:6px 0 0">' + (S.kunj === 'Onsite' ? 'ONSITE' : 'BOOKING') + '</div><dl><dt>Pasien</dt><dd>' + esc(nama || '—') + '</dd><dt>Status</dt><dd>' + ($('#fsl') && $('#fsl').value === 'Sasa' ? 'Baru · kartu SASA' : 'Pasien lama') + '</dd><dt>Dokter</dt><dd>' + esc(s ? s.dokter : '—') + '</dd><dt>Tanggal</dt><dd>' + esc(tglIndo(S.tgl)) + '</dd><dt>Jam</dt><dd>' + esc(jm ? jm + ' WIB' : '—') + '</dd></dl></div>' + (S.kunj === 'Appointment' ? '<p class="hint" style="margin-top:10px">Setelah disimpan, bukti booking bisa langsung dikirim ke pasien lewat WhatsApp.</p>' : '<p class="hint" style="margin-top:10px">Pasien Onsite dicatat untuk hari ini dengan jam sekarang.</p>');
+    $('#rail').innerHTML = S.hasil ? '' : '<div class="ticket"><div class="k">Ringkasan pendaftaran</div><div class="tcode" style="margin:6px 0 0">' + (S.kunj === 'Onsite' ? 'ONSITE' : 'BOOKING') + '</div><dl><dt>Pasien</dt><dd>' + esc(nama || '—') + '</dd><dt>Status</dt><dd>' + ($('#fsl') && $('#fsl').value === 'Sasa' ? 'Baru · kartu SASA' : ($('#fsl') && $('#fsl').value === 'Lama' ? 'Pasien lama' : 'Belum ditentukan')) + '</dd><dt>Dokter</dt><dd>' + esc(s ? s.dokter : '—') + '</dd><dt>Tanggal</dt><dd>' + esc(tglIndo(S.tgl)) + '</dd><dt>Jam</dt><dd>' + esc(jm ? jm + ' WIB' : '—') + '</dd></dl></div>' + (S.kunj === 'Appointment' ? '<p class="hint" style="margin-top:10px">Setelah disimpan, bukti booking bisa langsung dikirim ke pasien lewat WhatsApp.</p>' : '<p class="hint" style="margin-top:10px">Pasien Onsite dicatat untuk hari ini dengan jam sekarang.</p>');
   };
   const kosongkan = () => { S.slot = null; S.pasien = null; S.hasil = null; S.reqId = uid(); $('#fj').value = ''; $('#fc').value = ''; $('#fjam').value = S.kunj === 'Onsite' ? jamNow() : ''; bagianPasien(); renderSlot(); ringkas(); };
   el.addEventListener('click', e => {
@@ -243,7 +246,7 @@ page('/daftar', { title: 'Pendaftaran Baru', async render(el, p, q, ctx) {
     if (!$('#fj').value) return fieldErr($('#fj'), 'Pilih jenis pasien / penjamin.');
     const d = { kunjungan: S.kunj, tanggal: S.tgl, jam: $('#fjam').value, dokterId: s.dokterId, jenisPasien: $('#fj').value, sasa: $('#fsl').value, catatan: $('#fc').value.trim() };
     const n = $('#pn').value.trim(), h = $('#ph').value, k = $('#pk').value.trim(), em = $('#pe').value.trim();
-    if (n.length < 3) return fieldErr($('#pn'), 'Nama lengkap wajib diisi.'); if (!hpOk(h)) return fieldErr($('#ph'), 'Nomor WhatsApp tidak valid (contoh 0812xxxxxxxx).');
+    if (n.length < 3) return fieldErr($('#pn'), 'Nama lengkap wajib diisi.'); if (h.trim() && !hpOk(h)) return fieldErr($('#ph'), 'Nomor WhatsApp tidak valid (contoh 0812xxxxxxxx).');
     if (k && !nikOk(k)) return fieldErr($('#pk'), 'NIK harus 16 digit angka.'); if (em && !emailOk(em)) return fieldErr($('#pe'), 'Format email tidak valid.');
     if (S.pasien) d.pasienId = S.pasien.id;
     d.pasien = { nama: n, hp: h, nik: k, tglLahir: $('#pt').value, jk: $('#pj').value, email: em, rm: $('#pr').value.trim(), alamat: $('#pa').value.trim() };
@@ -251,8 +254,8 @@ page('/daftar', { title: 'Pendaftaran Baru', async render(el, p, q, ctx) {
     const j = await tulis('daftar.save', d, { reqId: S.reqId }); S.busy = false; btnBusy(b, false);
     if (!j) { if (S.slot) muatSlot(); return; }
     invalidateCache(); const bk = j.data.booking; S.hasil = bk;
-    $('#rail').innerHTML = '<div class="ticket"><div class="k">Pendaftaran tersimpan ' + ic('checkc', 14) + '</div><div class="tcode">' + esc(bk.id) + '</div><dl><dt>Pasien</dt><dd>' + esc(bk.nama) + '</dd><dt>No. RM</dt><dd>' + esc(bk.rm) + '</dd><dt>Dokter</dt><dd>' + esc(bk.dokter) + '</dd><dt>Jadwal</dt><dd>' + esc(tglIndo(bk.tgl, true) + ' · ' + jamTxt(bk) + ' WIB') + '</dd>' + (bk.sasa === 'Sasa' ? '<dt>Kartu</dt><dd style="color:var(--gold-h)">SASA baru ★</dd>' : '') + '</dl></div><div class="col" style="margin-top:12px"><button class="btn gold blk" id="r-wa" style="min-height:48px">' + ic('wa', 18) + ' Kirim bukti ke WhatsApp</button><button class="btn blk" id="r-pdf">' + ic('file', 16) + ' Unduh PDF</button><button class="btn blk" id="r-cp">' + ic('copy', 16) + ' Salin pesan</button><button class="btn blk ghost" id="r-new">' + ic('plus', 16) + ' Pendaftaran berikutnya</button></div>';
-    $('#r-wa').onclick = ev => bagikanBukti(bk, ev.currentTarget); $('#r-pdf').onclick = ev => cetakBukti(bk, ev.currentTarget); $('#r-cp').onclick = () => copyText(pesanBukti(bk)); $('#r-new').onclick = () => { kosongkan(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+    $('#rail').innerHTML = '<div class="ticket"><div class="k">Pendaftaran tersimpan ' + ic('checkc', 14) + '</div><div class="tcode">' + esc(bk.id) + '</div><dl><dt>Pasien</dt><dd>' + esc(bk.nama) + '</dd><dt>No. RM</dt><dd>' + esc(bk.rm) + '</dd><dt>Dokter</dt><dd>' + esc(bk.dokter) + '</dd><dt>Jadwal</dt><dd>' + esc(tglIndo(bk.tgl, true) + ' · ' + jamTxt(bk) + ' WIB') + '</dd>' + (bk.sasa === 'Sasa' ? '<dt>Kartu</dt><dd style="color:var(--gold-h)">SASA baru ★</dd>' : '') + '</dl></div><div class="col" style="margin-top:12px"><button class="btn gold blk" id="r-wa" style="min-height:48px">' + ic('wa', 18) + (hp(bk.hp) ? ' Kirim ke WhatsApp ' + esc(bk.hp) : ' Kirim bukti (pilih kontak)') + '</button><button class="btn blk" id="r-pdf">' + ic('file', 16) + ' Unduh PDF</button>' + (hp(bk.hp) ? '<button class="btn blk" id="r-sh">' + ic('wa', 16) + ' Bagikan PDF (pilih kontak)</button>' : '') + '<button class="btn blk" id="r-cp">' + ic('copy', 16) + ' Salin pesan</button><button class="btn blk ghost" id="r-new">' + ic('plus', 16) + ' Pendaftaran berikutnya</button></div>';
+    $('#r-wa').onclick = ev => bagikanBukti(bk, ev.currentTarget); $('#r-pdf').onclick = ev => cetakBukti(bk, ev.currentTarget); $('#r-cp').onclick = () => copyText(pesanBukti(bk)); if ($('#r-sh')) $('#r-sh').onclick = ev => bagikanBukti(bk, ev.currentTarget, true); $('#r-new').onclick = () => { kosongkan(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
     if (window.innerWidth < 1000) $('#rail').scrollIntoView({ behavior: 'smooth' });
     S.slots = []; muatSlot();
   };

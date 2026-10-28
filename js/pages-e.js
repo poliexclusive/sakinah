@@ -6,7 +6,7 @@ const Rekap = (function () {
   function asistenHari(tgl) { try { const s = localStorage.getItem(kunciAs(tgl)); if (s) return JSON.parse(s); } catch (e) { /* abaikan */ } return asistenBawaan().map(x => ({ nama: x.nama, jam: x.jam })); }
   function simpanAsistenHari(tgl, a) { try { localStorage.setItem(kunciAs(tgl), JSON.stringify(a)); } catch (e) { /* abaikan */ } }
   const tarikSesi = r => (r.jam ? (r.jam < '13:00' ? 'Pagi' : 'Sore') : r.sesi);
-  const jamR = r => r.jam || (r.sesi === 'Pagi' ? '08:00' : r.sesi === 'Sore' ? '16:00' : '');
+  const jamR = r => r.jam || r.sesi || '';
   const tglPendek = t => { const p = String(t).split('-'); return p[2] + '/' + p[1] + '/' + p[0]; };
 
   function teks(tgl, as) {
