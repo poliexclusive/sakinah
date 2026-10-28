@@ -182,48 +182,56 @@ page('/daftar', { title: 'Pendaftaran Baru', async render(el, p, q, ctx) {
   const jenis = (App.boot.referensi['Jenis Pasien'] || ['Umum']);
   el.innerHTML = '<div class="ph"><div><h1>Pendaftaran Baru</h1><div class="sub">Isi dari atas ke bawah.<span class="deskonly"> <kbd>F3</kbd> cari pasien · <kbd>F4</kbd> simpan · <kbd>Esc</kbd> kosongkan</span></div></div></div><div class="grid" style="grid-template-columns:minmax(0,1fr) 340px;align-items:start" id="dg"><div class="col" style="gap:16px">' +
     '<div class="card pad"><div class="row wrap" style="justify-content:space-between"><div><div class="lbl">1 · Jenis kunjungan</div><div class="seg mt" style="margin-top:6px" id="sk"><button data-k="Appointment" class="on">Appointment</button><button data-k="Onsite">Onsite (langsung datang)</button></div></div><div class="f" style="min-width:210px"><label>Tanggal kunjungan</label><input class="in" type="date" id="ft" value="' + S.tgl + '" min="' + (isAdmin() ? '' : todayStr()) + '"></div></div><div class="hint" style="margin-top:8px" id="th"></div></div>' +
-    '<div class="card pad"><div class="lbl">2 · Dokter & jam kunjungan</div><div class="f" style="max-width:220px;margin-top:10px"><label for="fjam">Jam kunjungan (WIB) <i>*</i></label><input class="in" type="time" id="fjam" step="60"></div><div class="hint" id="jh" style="margin:6px 0 10px">Jam bebas sesuai kesepakatan dengan pasien.</div><div class="slotg" id="sg">' + skel(2, 70) + '</div></div>' +
-    '<div class="card pad"><div class="row wrap" style="justify-content:space-between"><div class="lbl">3 · Data pasien</div><div class="seg" id="sm"><button data-m="lama" class="on">' + ic('search', 14) + ' Pasien terdaftar</button><button data-m="baru">' + ic('star', 14) + ' Pasien baru (kartu SASA)</button></div></div><div id="pb" class="mt" style="margin-top:14px"></div></div>' +
-    '<div class="card pad"><div class="lbl">4 · Penjamin & catatan</div><div class="fg mt" style="margin-top:10px"><div class="f"><label for="fj">Jenis pasien / penjamin <i>*</i></label><select class="in" id="fj">' + opt(jenis, '', 'Pilih…') + '</select></div><div class="f"><label for="fc">Catatan</label><input class="in" id="fc" maxlength="500" placeholder="Opsional, mis. keluhan / permintaan khusus"></div></div></div>' +
+    '<div class="card pad"><div class="lbl">2 · Dokter & jam kunjungan</div><div class="f" style="max-width:220px;margin-top:10px"><label for="fjam">Jam kunjungan (WIB) <i>*</i></label><input class="in" type="time" id="fjam" step="60"></div><div class="hint" id="jh" style="margin:6px 0 10px">Jam bebas sesuai kesepakatan dengan pasien.</div><div id="sg">' + skel(2, 70) + '</div></div>' +
+    '<div class="card pad"><div class="lbl">3 · Data pasien</div><div id="pb" class="mt" style="margin-top:14px"></div></div>' +
+    '<div class="card pad"><div class="lbl">4 · Penjamin & catatan</div><div class="fg mt" style="margin-top:10px"><div class="f"><label for="fsl">Sasa / Lama <i>*</i></label><select class="in" id="fsl"><option value="Lama">Lama (pasien lama)</option><option value="Sasa">Sasa (pasien baru, kartu SASA)</option></select></div><div class="f"><label for="fj">Jenis pasien / penjamin <i>*</i></label><select class="in" id="fj">' + opt(jenis, '', 'Pilih…') + '</select></div><div class="f"><label for="fc">Catatan</label><input class="in" id="fc" maxlength="500" placeholder="Opsional, mis. keluhan / permintaan khusus"></div></div></div>' +
     '<div class="row" style="justify-content:flex-end;gap:10px"><button class="btn" id="fr">Kosongkan</button><button class="btn gold" id="fs" style="min-width:200px;min-height:46px">' + ic('check', 18) + ' Simpan pendaftaran <kbd class="deskonly" style="margin-left:4px">F4</kbd></button></div></div>' +
     '<aside class="rail" id="rail"></aside></div>';
   if (window.innerWidth < 1000) $('#dg').style.gridTemplateColumns = '1fr';
   const bagianPasien = () => {
-    const pb = $('#pb');
-    if (S.mode === 'lama') {
-      pb.innerHTML = S.pasien ? '<div class="card" style="background:var(--gold-soft);border-color:#E7D5A7;padding:14px 16px"><div class="row"><div class="grow"><div class="b" style="font-size:16px">' + esc(S.pasien.nama) + '</div><div class="sm muted">RM ' + esc(S.pasien.rm) + (S.pasien.nik ? ' · NIK ' + esc(S.pasien.nik) : '') + '</div></div><button class="btn sm" id="pg">Ganti</button></div></div><div class="fg mt" style="margin-top:12px"><div class="f"><label>No. WhatsApp <i>*</i></label><input class="in" id="pp-hp" value="' + esc(S.pasien.hp) + '" inputmode="tel"></div><div class="f"><label>Email</label><input class="in" id="pp-em" type="email" value="' + esc(S.pasien.email || '') + '"></div><div class="f full"><label>Alamat</label><input class="in" id="pp-al" value="' + esc(S.pasien.alamat || '') + '"></div></div><div class="hint">Perubahan kontak di atas akan memperbarui data pasien.</div>'
-        : '<div class="f" style="position:relative"><label for="ps">Cari nama, No. RM, NIK, atau No. HP</label><input class="in" id="ps" placeholder="Ketik minimal 2 huruf…" autocomplete="off"><div class="sugg hide" id="sg2" role="listbox"></div></div><div class="hint" style="margin-top:8px">Belum terdaftar? Pilih tab <b>Pasien baru</b> di atas — pasien baru otomatis mendapat kartu SASA.</div>';
-      if (!S.pasien) pasangCari();
-    } else pb.innerHTML = '<div class="fg"><div class="f full"><label for="pn">Nama lengkap <i>*</i></label><input class="in" id="pn" autocomplete="off" maxlength="100"></div><div class="f"><label for="ph">No. WhatsApp <i>*</i></label><input class="in" id="ph" inputmode="tel" placeholder="08xxxxxxxxxx"></div><div class="f"><label for="pk">NIK (16 digit)</label><input class="in" id="pk" inputmode="numeric" maxlength="16"></div><div class="f"><label for="pt">Tanggal lahir</label><input class="in" id="pt" type="date" max="' + todayStr() + '"></div><div class="f"><label for="pj">Jenis kelamin</label><select class="in" id="pj"><option value="">—</option><option>Laki-laki</option><option>Perempuan</option></select></div><div class="f"><label for="pe">Email</label><input class="in" id="pe" type="email"></div><div class="f"><label for="pr">No. RM (kosongkan untuk otomatis)</label><input class="in" id="pr" maxlength="30"></div><div class="f full"><label for="pa">Alamat</label><input class="in" id="pa" maxlength="200"></div></div>';
-    const g = $('#pg'); if (g) g.onclick = () => { S.pasien = null; bagianPasien(); setTimeout(() => $('#ps') && $('#ps').focus(), 30); };
+    $('#pb').innerHTML = '<div class="f" style="position:relative;margin-bottom:14px"><label for="ps">Cari pasien terdaftar <span class="muted">(opsional, mengisi data otomatis)</span></label><input class="in" id="ps" placeholder="Nama, No. RM, NIK, atau No. HP…" autocomplete="off"><div class="sugg hide" id="sg2" role="listbox"></div><div id="pc" class="hide" style="margin-top:8px"></div></div>' +
+      '<div class="fg"><div class="f full"><label for="pn">Nama lengkap <i>*</i></label><input class="in" id="pn" autocomplete="off" maxlength="100"></div><div class="f"><label for="ph">No. WhatsApp <i>*</i></label><input class="in" id="ph" inputmode="tel" placeholder="08xxxxxxxxxx"></div><div class="f"><label for="pk">NIK (16 digit)</label><input class="in" id="pk" inputmode="numeric" maxlength="16"></div><div class="f"><label for="pt">Tanggal lahir</label><input class="in" id="pt" type="date" max="' + todayStr() + '"></div><div class="f"><label for="pj">Jenis kelamin</label><select class="in" id="pj"><option value="">—</option><option>Laki-laki</option><option>Perempuan</option></select></div><div class="f"><label for="pe">Email</label><input class="in" id="pe" type="email"></div><div class="f"><label for="pr">No. RM (diisi dari SIMRS)</label><input class="in" id="pr" maxlength="30"></div><div class="f full"><label for="pa">Alamat</label><input class="in" id="pa" maxlength="200"></div></div>';
+    $('#fsl') && ($('#fsl').value = 'Lama'); pasangCari();
   };
+  function isiPasien(x) {
+    const set = (id, v) => { const e = $('#' + id); if (e) e.value = v || ''; };
+    S.pasien = x; set('pn', x.nama); set('ph', x.hp); set('pk', x.nik); set('pt', x.tglLahir); set('pj', x.jk); set('pe', x.email); set('pr', x.rm); set('pa', x.alamat); set('ps', '');
+    if ($('#fsl')) $('#fsl').value = 'Lama';
+    const pc = $('#pc'); pc.classList.remove('hide'); pc.innerHTML = '<span class="chip gold">' + ic('checkc', 12) + ' Terhubung ke data pasien' + (x.rm ? ' · RM ' + esc(x.rm) : '') + '</span> <button type="button" class="btn sm" id="pg">Lepas</button>';
+    $('#pg').onclick = () => { S.pasien = null; pc.classList.add('hide'); ringkas(); };
+    ringkas();
+  }
   function pasangCari() {
     const inp = $('#ps'), box = $('#sg2'); let items = [], idx = -1;
-    const tampil = () => { box.classList.toggle('hide', !items.length && inp.value.trim().length < 2); box.innerHTML = items.length ? items.map((x, i) => '<button type="button" data-i="' + i + '" class="' + (i === idx ? 'on' : '') + '"><div class="b">' + esc(x.nama) + (x.sasa ? ' <span class="chip gold">SASA</span>' : '') + '</div><div class="sm muted">RM ' + esc(x.rm) + ' · ' + esc(x.hp) + (x.nik ? ' · NIK ' + esc(x.nik) : '') + '</div></button>').join('') : '<div class="empty" style="padding:14px">Tidak ditemukan. Daftarkan sebagai pasien baru.</div>'; };
+    const tampil = () => { box.classList.toggle('hide', !items.length && inp.value.trim().length < 2); box.innerHTML = items.length ? items.map((x, i) => '<button type="button" data-i="' + i + '" class="' + (i === idx ? 'on' : '') + '"><div class="b">' + esc(x.nama) + (x.sasa ? ' <span class="chip gold">SASA</span>' : '') + '</div><div class="sm muted">RM ' + esc(x.rm || '—') + ' · ' + esc(x.hp) + (x.nik ? ' · NIK ' + esc(x.nik) : '') + '</div></button>').join('') : '<div class="empty" style="padding:14px">Tidak ditemukan. Isi data di bawah sebagai pasien baru.</div>'; };
     const cari = debounce(async () => { const v = inp.value.trim(); if (v.length < 2) { items = []; return tampil(); } const j = await api('pasien.search', { q: v }); if (j.success && inp.value.trim() === v) { items = j.data.slice(0, 8); idx = items.length ? 0 : -1; tampil(); } }, 220);
-    const pilih = i => { S.pasien = items[i]; bagianPasien(); ringkas(); };
-    inp.oninput = cari; box.onclick = e => { const b = e.target.closest('[data-i]'); if (b) pilih(+b.dataset.i); };
-    inp.onkeydown = e => { if (e.key === 'ArrowDown') { idx = Math.min(items.length - 1, idx + 1); tampil(); e.preventDefault(); } else if (e.key === 'ArrowUp') { idx = Math.max(0, idx - 1); tampil(); e.preventDefault(); } else if (e.key === 'Enter' && idx >= 0) { e.preventDefault(); pilih(idx); } };
+    inp.oninput = cari; box.onclick = e => { const b = e.target.closest('[data-i]'); if (b) { const x = items[+b.dataset.i]; items = []; box.classList.add('hide'); isiPasien(x); } };
+    inp.onkeydown = e => { if (e.key === 'ArrowDown') { idx = Math.min(items.length - 1, idx + 1); tampil(); e.preventDefault(); } else if (e.key === 'ArrowUp') { idx = Math.max(0, idx - 1); tampil(); e.preventDefault(); } else if (e.key === 'Enter' && idx >= 0 && items[idx]) { e.preventDefault(); const x = items[idx]; items = []; box.classList.add('hide'); isiPasien(x); } };
   }
   const muatSlot = async () => {
     const g = $('#sg'); S.slot = null; ringkas(); $('#th').textContent = tglHari(S.tgl);
     await swr('slot:' + S.tgl, 'slot', { tanggal: S.tgl }, d => { if (!ctx.alive() || d.tanggal !== S.tgl) return; S.slots = d.slot; const keep = S.slot; renderSlot(); }, { guard: () => ctx.alive() && true });
   };
+  const kunciNama = n => String(n || '').toLowerCase().replace(/^drg?\.?\s*/, '').replace(/[^a-z0-9 ]/g, '');
+  const infoDokter = () => {
+    const x = S.slots.find(v => v.dokterId === S.slot), e = $('#fdi'); if (!e) return;
+    e.innerHTML = x ? '<span class="chip' + (x.jumlah ? ' gold' : '') + '">' + ic('clock', 12) + ' ' + x.jumlah + ' pasien pada tanggal ini' + (x.jam.length ? ' · jam ' + esc([...new Set(x.jam)].join(', ')) : '') + '</span> <span class="muted sm">' + esc(x.spesialis || '') + (x.ruang ? ' · ' + esc(x.ruang) : '') + '</span>' : '';
+  };
   const renderSlot = () => {
-    const g = $('#sg'); if (!S.slots.length) { g.innerHTML = '<div class="muted" style="grid-column:1/-1;padding:10px 0">Belum ada dokter aktif. Tambahkan dokter di menu Dokter.</div>'; return; }
-    g.innerHTML = S.slots.map((s, i) => '<button type="button" class="slot' + (S.slot === s.dokterId ? ' on' : '') + '" data-i="' + i + '"><div class="dn">' + esc(s.dokter) + '</div><div class="ds">' + esc(s.spesialis || '') + (s.ruang ? ' · ' + esc(s.ruang) : '') + '</div><div class="row" style="margin-top:6px"><span class="chip' + (s.jumlah ? ' gold' : '') + '">' + ic('clock', 12) + ' ' + s.jumlah + ' pasien' + (s.jam.length ? ' · ' + esc([...new Set(s.jam)].join(', ')) : '') + '</span></div></button>').join('');
+    const g = $('#sg'); if (!S.slots.length) { g.innerHTML = '<div class="muted" style="padding:10px 0">Belum ada dokter aktif. Tambahkan dokter di menu Dokter.</div>'; return; }
+    const urut = S.slots.slice().sort((a, b) => kunciNama(a.dokter).localeCompare(kunciNama(b.dokter)));
+    g.innerHTML = '<div class="f"><label for="fd">Dokter <i>*</i> <span class="muted">(ketik nama untuk mencari)</span></label><select class="in" id="fd"><option value="">Pilih dokter…</option>' + urut.map(x => '<option value="' + esc(x.dokterId) + '"' + (S.slot === x.dokterId ? ' selected' : '') + '>' + esc(x.dokter + (x.spesialis ? ' — ' + x.spesialis : '')) + '</option>').join('') + '</select></div><div id="fdi" style="margin-top:8px;min-height:24px"></div>';
+    infoDokter();
   };
   const ringkas = () => {
     if (S.hasil) return;
-    const s = S.slots.find(x => x.dokterId === S.slot); const jm = $('#fjam') && $('#fjam').value; const nama = S.mode === 'lama' ? (S.pasien && S.pasien.nama) : ($('#pn') && $('#pn').value.trim());
-    $('#rail').innerHTML = S.hasil ? '' : '<div class="ticket"><div class="k">Ringkasan pendaftaran</div><div class="tcode" style="margin:6px 0 0">' + (S.kunj === 'Onsite' ? 'ONSITE' : 'BOOKING') + '</div><dl><dt>Pasien</dt><dd>' + esc(nama || '—') + '</dd><dt>Status</dt><dd>' + (S.mode === 'baru' ? 'Baru · kartu SASA' : 'Pasien lama') + '</dd><dt>Dokter</dt><dd>' + esc(s ? s.dokter : '—') + '</dd><dt>Tanggal</dt><dd>' + esc(tglIndo(S.tgl)) + '</dd><dt>Jam</dt><dd>' + esc(jm ? jm + ' WIB' : '—') + '</dd></dl></div>' + (S.kunj === 'Appointment' ? '<p class="hint" style="margin-top:10px">Setelah disimpan, bukti booking bisa langsung dikirim ke pasien lewat WhatsApp.</p>' : '<p class="hint" style="margin-top:10px">Pasien Onsite dicatat untuk hari ini dengan jam sekarang.</p>');
+    const s = S.slots.find(x => x.dokterId === S.slot); const jm = $('#fjam') && $('#fjam').value; const nama = $('#pn') && $('#pn').value.trim();
+    $('#rail').innerHTML = S.hasil ? '' : '<div class="ticket"><div class="k">Ringkasan pendaftaran</div><div class="tcode" style="margin:6px 0 0">' + (S.kunj === 'Onsite' ? 'ONSITE' : 'BOOKING') + '</div><dl><dt>Pasien</dt><dd>' + esc(nama || '—') + '</dd><dt>Status</dt><dd>' + ($('#fsl') && $('#fsl').value === 'Sasa' ? 'Baru · kartu SASA' : 'Pasien lama') + '</dd><dt>Dokter</dt><dd>' + esc(s ? s.dokter : '—') + '</dd><dt>Tanggal</dt><dd>' + esc(tglIndo(S.tgl)) + '</dd><dt>Jam</dt><dd>' + esc(jm ? jm + ' WIB' : '—') + '</dd></dl></div>' + (S.kunj === 'Appointment' ? '<p class="hint" style="margin-top:10px">Setelah disimpan, bukti booking bisa langsung dikirim ke pasien lewat WhatsApp.</p>' : '<p class="hint" style="margin-top:10px">Pasien Onsite dicatat untuk hari ini dengan jam sekarang.</p>');
   };
   const kosongkan = () => { S.slot = null; S.pasien = null; S.hasil = null; S.reqId = uid(); $('#fj').value = ''; $('#fc').value = ''; $('#fjam').value = S.kunj === 'Onsite' ? jamNow() : ''; bagianPasien(); renderSlot(); ringkas(); };
   el.addEventListener('click', e => {
-    if (S.hasil && e.target.closest('#sk,#sm,#sg')) { S.hasil = null; S.reqId = uid(); }
+    if (S.hasil && e.target.closest('#sk')) { S.hasil = null; S.reqId = uid(); }
     const k = e.target.closest('#sk [data-k]'); if (k) { S.kunj = k.dataset.k; $$('#sk button').forEach(b => b.classList.toggle('on', b === k)); if (S.kunj === 'Onsite') { S.tgl = todayStr(); $('#ft').value = S.tgl; $('#ft').disabled = true; $('#fjam').value = jamNow(); muatSlot(); } else $('#ft').disabled = false; ringkas(); }
-    const m = e.target.closest('#sm [data-m]'); if (m) { S.mode = m.dataset.m; $$('#sm button').forEach(b => b.classList.toggle('on', b === m)); bagianPasien(); ringkas(); if (S.mode === 'baru') $('#pn').addEventListener('input', debounce(ringkas, 200)); }
-    const s = e.target.closest('#sg [data-i]'); if (s && !s.disabled) { const x = S.slots[+s.dataset.i]; S.slot = x.dokterId; renderSlot(); ringkas(); }
   });
   $('#ft').onchange = () => { if (S.hasil) { S.hasil = null; S.reqId = uid(); } S.tgl = $('#ft').value; if (S.tgl) muatSlot(); };
   $('#fjam').oninput = ringkas;
@@ -233,17 +241,12 @@ page('/daftar', { title: 'Pendaftaran Baru', async render(el, p, q, ctx) {
     const s = S.slots.find(x => x.dokterId === S.slot); if (!s) { toast('Pilih dokter terlebih dahulu.', 'err'); return $('#sg').scrollIntoView({ behavior: 'smooth', block: 'center' }); }
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test($('#fjam').value)) return fieldErr($('#fjam'), 'Isi jam kunjungan (contoh 14:30).');
     if (!$('#fj').value) return fieldErr($('#fj'), 'Pilih jenis pasien / penjamin.');
-    const d = { kunjungan: S.kunj, tanggal: S.tgl, jam: $('#fjam').value, dokterId: s.dokterId, jenisPasien: $('#fj').value, catatan: $('#fc').value.trim(), mode: S.mode };
-    if (S.mode === 'lama') {
-      if (!S.pasien) { toast('Cari dan pilih pasien terlebih dahulu.', 'err'); return $('#ps') && $('#ps').focus(); }
-      const h = $('#pp-hp').value, em = $('#pp-em').value.trim(); if (!hpOk(h)) return fieldErr($('#pp-hp'), 'Nomor WhatsApp tidak valid (contoh 0812xxxxxxxx).'); if (em && !emailOk(em)) return fieldErr($('#pp-em'), 'Format email tidak valid.');
-      d.pasienId = S.pasien.id; d.pasien = { hp: h, email: em, alamat: $('#pp-al').value.trim() };
-    } else {
-      const n = $('#pn').value.trim(), h = $('#ph').value, k = $('#pk').value.trim(), em = $('#pe').value.trim();
-      if (n.length < 3) return fieldErr($('#pn'), 'Nama lengkap wajib diisi.'); if (!hpOk(h)) return fieldErr($('#ph'), 'Nomor WhatsApp tidak valid (contoh 0812xxxxxxxx).');
-      if (k && !nikOk(k)) return fieldErr($('#pk'), 'NIK harus 16 digit angka.'); if (em && !emailOk(em)) return fieldErr($('#pe'), 'Format email tidak valid.');
-      d.pasien = { nama: n, hp: h, nik: k, tglLahir: $('#pt').value, jk: $('#pj').value, email: em, rm: $('#pr').value.trim(), alamat: $('#pa').value.trim() };
-    }
+    const d = { kunjungan: S.kunj, tanggal: S.tgl, jam: $('#fjam').value, dokterId: s.dokterId, jenisPasien: $('#fj').value, sasa: $('#fsl').value, catatan: $('#fc').value.trim() };
+    const n = $('#pn').value.trim(), h = $('#ph').value, k = $('#pk').value.trim(), em = $('#pe').value.trim();
+    if (n.length < 3) return fieldErr($('#pn'), 'Nama lengkap wajib diisi.'); if (!hpOk(h)) return fieldErr($('#ph'), 'Nomor WhatsApp tidak valid (contoh 0812xxxxxxxx).');
+    if (k && !nikOk(k)) return fieldErr($('#pk'), 'NIK harus 16 digit angka.'); if (em && !emailOk(em)) return fieldErr($('#pe'), 'Format email tidak valid.');
+    if (S.pasien) d.pasienId = S.pasien.id;
+    d.pasien = { nama: n, hp: h, nik: k, tglLahir: $('#pt').value, jk: $('#pj').value, email: em, rm: $('#pr').value.trim(), alamat: $('#pa').value.trim() };
     S.busy = true; const b = $('#fs'); btnBusy(b, true);
     const j = await tulis('daftar.save', d, { reqId: S.reqId }); S.busy = false; btnBusy(b, false);
     if (!j) { if (S.slot) muatSlot(); return; }
@@ -254,7 +257,8 @@ page('/daftar', { title: 'Pendaftaran Baru', async render(el, p, q, ctx) {
     S.slots = []; muatSlot();
   };
   $('#fs').onclick = simpan;
-  const key = e => { if (e.key === 'F3') { e.preventDefault(); if (S.mode === 'lama' && !S.pasien) $('#ps') && $('#ps').focus(); else if (S.mode === 'baru') $('#pn').focus(); } else if (e.key === 'F4') { e.preventDefault(); simpan(); } else if (e.key === 'Escape' && !$('.mod')) { kosongkan(); } };
+  const key = e => { if (e.key === 'F3') { e.preventDefault(); $('#ps') && $('#ps').focus(); } else if (e.key === 'F4') { e.preventDefault(); simpan(); } else if (e.key === 'Escape' && !$('.mod')) { kosongkan(); } };
   document.addEventListener('keydown', key); ctx.onLeave(() => document.removeEventListener('keydown', key));
+  el.addEventListener('input', e => { if (e.target.closest('#pn,#fsl,#fjam')) ringkas(); }); el.addEventListener('change', e => { if (e.target.id === 'fd') { if (S.hasil) { S.hasil = null; S.reqId = uid(); } S.slot = e.target.value || null; infoDokter(); ringkas(); } if (e.target.closest('#fsl')) ringkas(); });
   bagianPasien(); ringkas(); muatSlot();
 } });

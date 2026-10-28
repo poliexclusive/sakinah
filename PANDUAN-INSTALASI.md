@@ -101,6 +101,14 @@ Catatan: perubahan jadwal asisten per hari tersimpan di perangkat yang dipakai; 
 
 Ganti `Pendaftaran.gs` di Apps Script, lalu **Manage deployments → New version**. Salin ZIP ke repository (jangan timpa `js/config.js`), lalu `git add .`, `git commit`, `git push`. Di Rekap Hari Ini, klik baris pasien untuk membuka detail; tombol **Ubah data** mengubah semua isian (nama, RM, NIK, WhatsApp, alamat, dokter, tanggal, jam, penjamin, jenis kunjungan, Sasa/Lama, catatan).
 
+## UPDATE — Formulir satu halaman & impor 36 dokter
+
+1. Ganti `Admin.gs` dan `Pendaftaran.gs` di Apps Script, lalu **Manage deployments → New version**.
+2. Salin ZIP ke repository (**jangan timpa `js/config.js`**), `git add .`, `git commit`, `git push`, lalu Ctrl+F5.
+3. Buka menu **Dokter**, klik **Impor dari Google Form**. 36 dokter masuk sekaligus; yang sudah ada dilewati, jadi aman diulang. Dokter contoh ("dr. Contoh …") bila ada, nonaktifkan lewat tombol ubah.
+
+Formulir pendaftaran: pilih dokter lewat kolom yang bisa diketik, isi data pasien, pilih **Sasa/Lama** dan penjamin. **No. RM dibiarkan kosong bila tidak diisi** (tidak lagi dibuat otomatis). Kolom *Cari pasien terdaftar* bersifat opsional untuk mengisi data otomatis.
+
 ## Cara pakai singkat
 
 - **Pendaftaran Baru**: pilih Appointment/Onsite → tanggal → jam kunjungan (bebas, format 24 jam) & dokter → pasien terdaftar *atau* pasien baru (otomatis kartu **SASA**) → penjamin → **F4** simpan. Onsite langsung *Hadir* + nomor antrean.

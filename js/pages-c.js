@@ -36,7 +36,7 @@ page('/laporan', { title: 'Laporan & Grafik', async render(el, p, q, ctx) {
 // ---------- DOKTER & KUOTA (Admin) ----------
 const HARI_PRAKTIK = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 page('/jadwal', { title: 'Dokter', admin: true, async render(el, p, q, ctx) {
-  el.innerHTML = '<div class="ph"><div><h1>Dokter</h1><div class="sub">Daftar dokter yang dapat dipilih saat pendaftaran. Jam kunjungan ditentukan bebas oleh pasien.</div></div><div class="act"><button class="btn pri" id="da">' + ic('plus', 16) + ' Tambah dokter</button></div></div><div id="dl">' + skel(4, 40) + '</div>';
+  el.innerHTML = '<div class="ph"><div><h1>Dokter</h1><div class="sub">Daftar dokter yang dapat dipilih saat pendaftaran. Jam kunjungan ditentukan bebas oleh pasien.</div></div><div class="act"><button class="btn" id="di">' + ic('download', 16) + ' Impor dari Google Form</button><button class="btn pri" id="da">' + ic('plus', 16) + ' Tambah dokter</button></div></div><div id="dl">' + skel(4, 40) + '</div>';
   let D = null;
   const render = () => {
     $('#dl').innerHTML = D.dokter.length ? '<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(380px,1fr))">' + D.dokter.map(d => {
@@ -48,6 +48,13 @@ page('/jadwal', { title: 'Dokter', admin: true, async render(el, p, q, ctx) {
         const nama = $('#d-n', el).value.trim(); if (nama.length < 3) { fieldErr($('#d-n', el), 'Nama dokter wajib diisi.'); return false; }
         const r = await tulis('dokter.save', { dokter: { id: d && d.ID_Dokter, nama, spesialis: $('#d-s', el).value.trim(), ruang: $('#d-r', el).value.trim(), aktif: $('#d-a', el).checked } }); if (!r) return false; invalidateCache(); await refreshBoot(); load(); return true; } }]) });
   }
+  el.addEventListener('click', async e => {
+    const im = e.target.closest('#di'); if (im) {
+      if (!await konfirmasi('Impor daftar dokter?', 'Menambahkan 36 dokter dari Google Form pendaftaran. Dokter yang sudah ada (nama sama) dilewati, jadi aman dijalankan ulang.', { ok: 'Impor' })) return;
+      btnBusy(im, true); const r = await tulis('dokter.imporForm', {}); btnBusy(im, false);
+      if (r) { toast(r.data.tambah + ' dokter ditambahkan, ' + r.data.dilewati + ' sudah ada.', 'ok'); await refreshBoot(); load(); } return;
+    }
+  });
   el.addEventListener('click', e => { if (e.target.closest('#da,#da2')) return form(null); const b = e.target.closest('[data-ed]'); if (b) form(D.dokter.find(x => x.ID_Dokter === b.dataset.ed)); });
   load();
 } });
