@@ -38,12 +38,15 @@ async function kirimWA(r) {
   if (!j.success) { if (w) w.close(); return toast(j.message, 'err'); }
   if (w) w.location = j.data.url; else location.href = j.data.url;
 }
-function urlVerif(r) { const base = String((App.boot.config && App.boot.config.appUrl) || (location.origin + location.pathname)).replace(/\/+$/, '').replace(/\/index\.html$/, ''); return base + '/#/v/' + r.kode; }
+const APP_URL_BAWAAN = 'https://rsisakinah.github.io/poliexclusive';
+function urlVerif(r) { const base = String((App.boot && App.boot.config && App.boot.config.appUrl) || APP_URL_BAWAAN).replace(/\/+$/, '').replace(/\/index\.html$/, ''); return base + '/#/v/' + r.kode; }
 function namaBerkas(r) { const t = String(r.tgl).split('-'); return 'Booking_' + t[2] + '_' + t[1] + '_' + t[0] + '__' + String(r.nama).trim().replace(/[^A-Za-z0-9]+/g, '_').toUpperCase() + '.pdf'; }
 function buatBuktiBlob(r) { return Tiket.pdf({ nama: r.nama, rm: r.rm, tgl: r.tgl, jam: r.jam || '', alamat: r.alamat, dokter: r.dokter, id: r.id, verifUrl: urlVerif(r) }); }
-const PESAN_BAWAAN = "Assalamu'alaikum Bapak/Ibu {nama},\n\nBerikut bukti booking *Poli Exclusive RSI Sakinah Mojokerto*:\n\n📅 {hari}, {tanggal}\n🕐 Pukul {jam} WIB\n👨‍⚕️ {dokter}\n🔖 Kode booking: {id}\n\nMohon hadir 15 menit lebih awal dan membawa kartu identitas. Tunjukkan bukti booking ini kepada petugas pendaftaran.\n\nTerima kasih 🙏";
+const PESAN_BAWAAN = "Assalamu'alaikum Bapak/Ibu {nama},\n\nBerikut bukti booking *Poli Exclusive RSI Sakinah Mojokerto*:\n\n📅 {hari}, {tanggal}\n🕐 Pukul {jam} WIB\n👨‍⚕️ {dokter}\n🔖 Kode booking: {id}\n\nBukti booking (tiket) dapat dilihat dan disimpan di tautan berikut:\n{link}\n\nMohon hadir 15 menit lebih awal dan membawa kartu identitas. Tunjukkan bukti booking ini kepada petugas pendaftaran.\n\nTerima kasih 🙏";
 function pesanBukti(r) {
-  const tpl = (App.boot.config && App.boot.config.pesanBukti) || PESAN_BAWAAN, v = { nama: r.nama, hari: r.hari || hariDari(r.tgl), tanggal: tglIndo(r.tgl), jam: r.jam || jamTxt(r), dokter: r.dokter, id: r.id, rm: r.rm || '' };
+  let tpl = (App.boot.config && App.boot.config.pesanBukti) || PESAN_BAWAAN;
+  const v = { nama: r.nama, hari: r.hari || hariDari(r.tgl), tanggal: tglIndo(r.tgl), jam: r.jam || jamTxt(r), dokter: r.dokter, id: r.id, rm: r.rm || '', link: urlVerif(r) };
+  if (tpl.indexOf('{link}') < 0) tpl += '\n\nBukti booking (tiket):\n{link}';
   return tpl.replace(/\{(\w+)\}/g, (m, k) => (v[k] !== undefined ? v[k] : m));
 }
 function linkWA(r, teks) { let n = hp(r.hp); if (n.startsWith('0')) n = '62' + n.slice(1); else if (n.startsWith('8')) n = '62' + n; return 'https://wa.me/' + n + '?text=' + encodeURIComponent(teks); }
@@ -53,21 +56,22 @@ async function cetakBukti(r, btn) {
   catch (e) { toast('Bukti belum dapat dibuat: ' + (e && e.message || e), 'err'); }
   btnBusy(btn, false);
 }
-/** Kirim bukti. Bila ada nomor pasien: langsung membuka chat nomor itu (pesan terisi) dan PDF diunduh untuk dilampirkan. Tanpa nomor: menu bagikan HP / unduh di komputer. */
+/** Kirim bukti sebagai TAUTAN (tanpa PDF). Ada nomor pasien: langsung buka chat nomor itu dengan pesan + tautan. Tanpa nomor: menu bagikan HP, atau pesan disalin. */
 async function bagikanBukti(r, btn, pilihKontak) {
+  const teks = pesanBukti(r), punya = !!hp(r.hp) && !pilihKontak;
+  if (punya) { window.open(linkWA(r, teks), '_blank'); toast('Chat ' + r.hp + ' dibuka. Tinggal tekan kirim.', 'ok'); return; }
+  if (navigator.share) { try { await navigator.share({ text: teks }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
+  copyText(teks); toast('Pesan + tautan disalin. Tempel di chat WhatsApp pasien.', 'ok');
+}
+/** Salin gambar tiket (PNG) ke clipboard untuk ditempel ke WhatsApp Web; bila tidak didukung, unduh PNG. */
+async function salinGambar(r, btn) {
   btnBusy(btn, true);
   try {
-    const blob = await buatBuktiBlob(r), teks = pesanBukti(r), file = new File([blob], namaBerkas(r), { type: 'application/pdf' });
-    const punya = !!hp(r.hp) && !pilihKontak;
-    if (!punya && navigator.canShare && navigator.canShare({ files: [file] })) {
-      try { await navigator.share({ files: [file], text: teks }); btnBusy(btn, false); return; } catch (e) { if (e && e.name === 'AbortError') { btnBusy(btn, false); return; } }
-    }
-    unduh(file.name, blob); copyText(teks);
-    if (punya) {
-      window.open(linkWA(r, teks), '_blank');
-      toast('Chat ' + r.hp + ' dibuka dengan pesan siap kirim. Lampirkan PDF: ketuk 📎 → Dokumen → pilih ' + file.name, 'ok');
-    } else toast('PDF diunduh dan pesan disalin. Pasien belum punya nomor WhatsApp: lampirkan PDF di chat yang dipilih.', 'ok');
-  } catch (e) { toast('Gagal menyiapkan bukti: ' + (e && e.message || e), 'err'); }
+    const cv = await Tiket.gambar({ nama: r.nama, rm: r.rm, tgl: r.tgl, jam: r.jam || '', alamat: r.alamat, dokter: r.dokter, id: r.id, verifUrl: urlVerif(r) });
+    const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
+    if (navigator.clipboard && window.ClipboardItem) { await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); toast('Gambar tiket disalin. Tempel (Ctrl+V) di chat WhatsApp.', 'ok'); }
+    else { unduh(namaBerkas(r).replace(/\.pdf$/, '.png'), blob); toast('Gambar tiket diunduh.', 'ok'); }
+  } catch (e) { toast('Gambar belum dapat disalin: ' + (e && e.message || e), 'err'); }
   btnBusy(btn, false);
 }
 function bukaDetail(r, rerender) {
@@ -78,7 +82,7 @@ function bukaDetail(r, rerender) {
   const m = modal({ title: nm, size: 'lg', body: '<div class="fg">' + dl.map(x => '<div><div class="lbl">' + x[0] + '</div><div>' + x[1] + '</div></div>').join('') + '</div>', foot: false });
   const bar = document.createElement('div'); bar.className = 'mf';
   const add = (id, label, ico, cls) => { const b = document.createElement('button'); b.className = 'btn ' + (cls || ''); b.dataset.a = id; b.innerHTML = ic(ico, 16) + ' ' + label; bar.appendChild(b); };
-  if (r.status !== 'Batal') { add('share', 'Kirim bukti', 'wa', 'pri'); add('bukti', 'Unduh PDF', 'file'); }
+  if (r.status !== 'Batal') { add('share', 'Kirim bukti', 'wa', 'pri'); add('gambar', 'Salin gambar', 'copy'); add('bukti', 'Unduh PDF', 'file'); }
   add('edit', 'Ubah data', 'edit');
   if (['Terdaftar', 'Menunggu', 'Terkonfirmasi'].includes(r.status)) add('jadwal', 'Jadwal ulang', 'calendar');
   st.forEach(s => add('st:' + s, s === 'Batal' ? 'Batalkan' : s === 'Menunggu' && r.status === 'Batal' ? 'Aktifkan kembali' : s === 'Menunggu' ? 'Kembali ke menunggu' : s === 'Hadir' ? 'Check-in' : s === 'Terkonfirmasi' ? 'Konfirmasi' : s, s === 'Batal' ? 'ban' : 'check', s === 'Batal' ? 'dng' : (s === 'Terkonfirmasi' || s === 'Hadir' || s === 'Selesai') ? 'pri' : ''));
@@ -86,7 +90,7 @@ function bukaDetail(r, rerender) {
   $('.box', m.el).appendChild(bar);
   bar.onclick = async e => {
     const b = e.target.closest('[data-a]'); if (!b) return; const a = b.dataset.a;
-    if (a === 'bukti') return cetakBukti(r, b); if (a === 'share') return bagikanBukti(r, b); if (a === 'wa') return kirimWA(r);
+    if (a === 'bukti') return cetakBukti(r, b); if (a === 'gambar') return salinGambar(r, b); if (a === 'share') return bagikanBukti(r, b); if (a === 'wa') return kirimWA(r);
     if (a === 'edit') { m.close(); return ubahCatatan(r, rerender); } if (a === 'jadwal') { m.close(); return jadwalUlang(r, rerender); }
     if (a === 'hapus') { const ok = await konfirmasi('Hapus data pendaftaran?', 'Data <b>' + esc(r.nama) + '</b> (' + esc(r.id) + ') akan dihapus permanen dan tidak dapat dikembalikan.', { bahaya: true, ok: 'Hapus permanen' }); if (!ok) return; const j = await tulis('daftar.delete', { id: r.id }); if (j) { invalidateCache(); m.close(); if (rerender) rerender('hapus', r); } return; }
     if (a.startsWith('st:')) { const ke = a.slice(3); let alasan; if (ke === 'Batal') { alasan = await konfirmasi('Batalkan booking?', 'Booking <b>' + esc(r.nama) + '</b> akan dibatalkan.', { alasan: 'Alasan pembatalan', bahaya: true, ok: 'Ya, batalkan' }); if (!alasan) return; } m.close(); await ubahStatus(r, ke, rerender, alasan); }
@@ -150,8 +154,20 @@ page('/v/:kode', { pub: true, title: 'Verifikasi Booking', async render(el, p) {
   if (!j.success) { c.innerHTML = '<div style="color:var(--err)">' + ic('ban', 48) + '</div><h2 style="margin-top:8px">Tidak Ditemukan</h2><p class="muted">' + esc(j.message || 'Kode verifikasi tidak dikenali.') + '</p>'; return; }
   const d = j.data, ok = d.valid && d.cocokBukti;
   c.innerHTML = '<div style="color:' + (ok ? 'var(--ok)' : 'var(--err)') + '">' + ic(ok ? 'checkc' : 'alert', 52) + '</div><h2 style="margin:8px 0 4px">' + (ok ? 'Booking Valid' : d.valid ? 'Jadwal Telah Berubah' : 'Booking Dibatalkan') + '</h2><p class="muted" style="margin:0 0 18px">' + esc(d.institusi) + '</p>' +
-    '<div style="text-align:left;border-top:1px dashed var(--line);padding-top:16px" class="col">' + [['Kode booking', '<span class="code">' + esc(d.kode) + '</span>'], ['Pasien', esc(d.pasien)], ['Dokter', esc(d.dokter)], ['Jadwal', esc(d.hari + ', ' + tglIndo(d.tanggal))], ['Jam', esc(d.jam ? d.jam + ' WIB' : d.sesi)], ['Status', badge(d.status)]].map(x => '<div class="row" style="justify-content:space-between"><span class="muted">' + x[0] + '</span><b style="text-align:right">' + x[1] + '</b></div>').join('') + '</div>' + (ok ? '' : '<p class="errt" style="margin-top:14px">' + (d.valid ? 'Bukti yang Anda bawa dibuat sebelum jadwal diubah. Data di atas adalah jadwal terbaru.' : 'Hubungi petugas pendaftaran untuk memastikan jadwal Anda.') + '</p>');
+    '<div style="text-align:left;border-top:1px dashed var(--line);padding-top:16px" class="col">' + [['Kode booking', '<span class="code">' + esc(d.kode) + '</span>'], ['Pasien', esc(d.nama || d.pasien)], ['Dokter', esc(d.dokter)], ['Jadwal', esc(d.hari + ', ' + tglIndo(d.tanggal))], ['Jam', esc(d.jam ? d.jam + ' WIB' : d.sesi)], ['Status', badge(d.status)]].map(x => '<div class="row" style="justify-content:space-between"><span class="muted">' + x[0] + '</span><b style="text-align:right">' + x[1] + '</b></div>').join('') + '</div>' + (ok ? '' : '<p class="errt" style="margin-top:14px">' + (d.valid ? 'Bukti yang Anda bawa dibuat sebelum jadwal diubah. Data di atas adalah jadwal terbaru.' : 'Hubungi petugas pendaftaran untuk memastikan jadwal Anda.') + '</p>') +
+    (d.valid && d.nama ? '<div id="vt" style="margin-top:20px"><div class="muted" style="font-size:13px">Menyiapkan tiket…</div></div>' : '');
+  if (d.valid && d.nama) tiketPublik(d);
 } });
+async function tiketPublik(d) {
+  const box = $('#vt'); if (!box) return;
+  try {
+    const dat = { nama: d.nama, rm: d.rm, tgl: d.tanggal, jam: d.jam || '', alamat: d.alamat, dokter: d.dokter, id: d.kode, verifUrl: location.href.split('?')[0] };
+    const cv = await Tiket.gambar(dat), png = await new Promise(res => cv.toBlob(res, 'image/png')), url = URL.createObjectURL(png);
+    box.innerHTML = '<img alt="Tiket booking" src="' + url + '" style="width:100%;border-radius:10px;box-shadow:0 6px 22px rgba(11,25,44,.18)"><div class="col" style="margin-top:14px"><button class="btn gold blk" id="v-png">' + ic('download', 16) + ' Simpan gambar tiket</button><button class="btn blk" id="v-pdf">' + ic('file', 16) + ' Unduh PDF</button></div><p class="muted" style="font-size:12px;margin-top:10px">Tekan lama pada gambar untuk menyimpannya di galeri. Tunjukkan tiket ini kepada petugas pendaftaran.</p>';
+    $('#v-png').onclick = () => unduh('Tiket_' + d.kode + '.png', png);
+    $('#v-pdf').onclick = async ev => { btnBusy(ev.currentTarget, true); try { unduh('Tiket_' + d.kode + '.pdf', await Tiket.pdf(dat)); } catch (e) { toast('PDF belum dapat dibuat.', 'err'); } btnBusy(ev.currentTarget, false); };
+  } catch (e) { box.innerHTML = ''; }
+}
 page('/404', { title: 'Tidak ditemukan', render(el) { el.innerHTML = '<div class="card pad"><div class="empty">' + ic('search', 36) + '<p><b>Halaman tidak ditemukan</b></p><a class="btn" href="#/">Ke Beranda</a></div></div>'; } });
 
 // ---------- BERANDA ----------
@@ -254,8 +270,8 @@ page('/daftar', { title: 'Pendaftaran Baru', async render(el, p, q, ctx) {
     const j = await tulis('daftar.save', d, { reqId: S.reqId }); S.busy = false; btnBusy(b, false);
     if (!j) { if (S.slot) muatSlot(); return; }
     invalidateCache(); const bk = j.data.booking; S.hasil = bk;
-    $('#rail').innerHTML = '<div class="ticket"><div class="k">Pendaftaran tersimpan ' + ic('checkc', 14) + '</div><div class="tcode">' + esc(bk.id) + '</div><dl><dt>Pasien</dt><dd>' + esc(bk.nama) + '</dd><dt>No. RM</dt><dd>' + esc(bk.rm) + '</dd><dt>Dokter</dt><dd>' + esc(bk.dokter) + '</dd><dt>Jadwal</dt><dd>' + esc(tglIndo(bk.tgl, true) + ' · ' + jamTxt(bk) + ' WIB') + '</dd>' + (bk.sasa === 'Sasa' ? '<dt>Kartu</dt><dd style="color:var(--gold-h)">SASA baru ★</dd>' : '') + '</dl></div><div class="col" style="margin-top:12px"><button class="btn gold blk" id="r-wa" style="min-height:48px">' + ic('wa', 18) + (hp(bk.hp) ? ' Kirim ke WhatsApp ' + esc(bk.hp) : ' Kirim bukti (pilih kontak)') + '</button><button class="btn blk" id="r-pdf">' + ic('file', 16) + ' Unduh PDF</button>' + (hp(bk.hp) ? '<button class="btn blk" id="r-sh">' + ic('wa', 16) + ' Bagikan PDF (pilih kontak)</button>' : '') + '<button class="btn blk" id="r-cp">' + ic('copy', 16) + ' Salin pesan</button><button class="btn blk ghost" id="r-new">' + ic('plus', 16) + ' Pendaftaran berikutnya</button></div>';
-    $('#r-wa').onclick = ev => bagikanBukti(bk, ev.currentTarget); $('#r-pdf').onclick = ev => cetakBukti(bk, ev.currentTarget); $('#r-cp').onclick = () => copyText(pesanBukti(bk)); if ($('#r-sh')) $('#r-sh').onclick = ev => bagikanBukti(bk, ev.currentTarget, true); $('#r-new').onclick = () => { kosongkan(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+    $('#rail').innerHTML = '<div class="ticket"><div class="k">Pendaftaran tersimpan ' + ic('checkc', 14) + '</div><div class="tcode">' + esc(bk.id) + '</div><dl><dt>Pasien</dt><dd>' + esc(bk.nama) + '</dd><dt>No. RM</dt><dd>' + esc(bk.rm) + '</dd><dt>Dokter</dt><dd>' + esc(bk.dokter) + '</dd><dt>Jadwal</dt><dd>' + esc(tglIndo(bk.tgl, true) + ' · ' + jamTxt(bk) + ' WIB') + '</dd>' + (bk.sasa === 'Sasa' ? '<dt>Kartu</dt><dd style="color:var(--gold-h)">SASA baru ★</dd>' : '') + '</dl></div><div class="col" style="margin-top:12px"><button class="btn gold blk" id="r-wa" style="min-height:48px">' + ic('wa', 18) + (hp(bk.hp) ? ' Kirim tautan ke WhatsApp ' + esc(bk.hp) : ' Kirim tautan bukti (pilih kontak)') + '</button><button class="btn blk" id="r-pdf">' + ic('file', 16) + ' Unduh PDF</button>' + (hp(bk.hp) ? '<button class="btn blk" id="r-sh">' + ic('wa', 16) + ' Bagikan ke kontak lain</button>' : '') + '<button class="btn blk" id="r-img">' + ic('copy', 16) + ' Salin gambar tiket</button>' + '<button class="btn blk" id="r-cp">' + ic('copy', 16) + ' Salin pesan</button><button class="btn blk ghost" id="r-new">' + ic('plus', 16) + ' Pendaftaran berikutnya</button></div>';
+    $('#r-wa').onclick = ev => bagikanBukti(bk, ev.currentTarget); $('#r-pdf').onclick = ev => cetakBukti(bk, ev.currentTarget); $('#r-cp').onclick = () => copyText(pesanBukti(bk)); $('#r-img').onclick = ev => salinGambar(bk, ev.currentTarget); if ($('#r-sh')) $('#r-sh').onclick = ev => bagikanBukti(bk, ev.currentTarget, true); $('#r-new').onclick = () => { kosongkan(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
     if (window.innerWidth < 1000) $('#rail').scrollIntoView({ behavior: 'smooth' });
     S.slots = []; muatSlot();
   };
